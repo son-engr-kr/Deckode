@@ -5,8 +5,9 @@ import type { Deck } from "@/types/deck";
 
 export function CodePanel() {
   const deck = useDeckStore((s) => s.deck);
-  const loadDeck = useDeckStore((s) => s.loadDeck);
+  const replaceDeck = useDeckStore((s) => s.replaceDeck);
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  const suppressChange = useRef(false);
 
   const handleMount: OnMount = (editor) => {
     editorRef.current = editor;
@@ -14,16 +15,31 @@ export function CodePanel() {
 
   const handleChange = useCallback(
     (value: string | undefined) => {
-      if (!value) return;
+      if (!value || suppressChange.current) return;
       const parsed = JSON.parse(value) as Deck;
-      loadDeck(parsed);
+      suppressChange.current = true;
+      replaceDeck(parsed);
+      suppressChange.current = false;
     },
-    [loadDeck],
+    [replaceDeck],
   );
 
   if (!deck) return null;
 
+  // Sync store → editor only when editor is not focused (user not typing)
   const json = JSON.stringify(deck, null, 2);
+  if (editorRef.current) {
+    const editor = editorRef.current;
+    const model = editor.getModel();
+    if (model && !editor.hasTextFocus()) {
+      const currentValue = model.getValue();
+      if (currentValue !== json) {
+        suppressChange.current = true;
+        model.setValue(json);
+        suppressChange.current = false;
+      }
+    }
+  }
 
   return (
     <div className="h-full">
@@ -31,7 +47,7 @@ export function CodePanel() {
         height="100%"
         language="json"
         theme="vs-dark"
-        value={json}
+        defaultValue={json}
         onChange={handleChange}
         onMount={handleMount}
         options={{

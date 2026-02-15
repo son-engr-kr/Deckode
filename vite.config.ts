@@ -11,4 +11,13 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
     },
   },
+  server: {
+    watch: {
+      ignored: ["**/deck.json"],
+    },
+  },
+  test: {
+    globals: true,
+    environment: "node",
+  },
 });

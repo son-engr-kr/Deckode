@@ -12,21 +12,32 @@ export function SlideRenderer({ slide, scale }: Props) {
 
   return (
     <div
-      className="relative overflow-hidden"
       style={{
-        width: CANVAS_WIDTH,
-        height: CANVAS_HEIGHT,
-        transform: `scale(${scale})`,
-        transformOrigin: "top left",
-        backgroundColor: bg?.color ?? "#0f172a",
-        backgroundImage: bg?.image ? `url(${bg.image})` : undefined,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
+        width: CANVAS_WIDTH * scale,
+        height: CANVAS_HEIGHT * scale,
+        overflow: "hidden",
+        position: "relative",
       }}
     >
-      {slide.elements.map((element) => (
-        <ElementRenderer key={element.id} element={element} />
-      ))}
+      <div
+        style={{
+          width: CANVAS_WIDTH,
+          height: CANVAS_HEIGHT,
+          transform: `scale(${scale})`,
+          transformOrigin: "top left",
+          backgroundColor: bg?.color ?? "#0f172a",
+          backgroundImage: bg?.image ? `url(${bg.image})` : undefined,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          position: "absolute",
+          top: 0,
+          left: 0,
+        }}
+      >
+        {slide.elements.map((element) => (
+          <ElementRenderer key={element.id} element={element} />
+        ))}
+      </div>
     </div>
   );
 }

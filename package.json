@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -20,6 +22,7 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "shiki": "^3.22.0",
+    "zundo": "^2.3.0",
     "zustand": "^5.0.3"
   },
   "devDependencies": {
@@ -36,6 +39,7 @@
     "tailwindcss": "^4.1.3",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.26.1",
-    "vite": "^6.3.0"
+    "vite": "^6.3.0",
+    "vitest": "^4.0.18"
   }
 }

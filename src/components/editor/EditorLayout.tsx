@@ -4,6 +4,7 @@ import { SlideList } from "./SlideList";
 import { EditorCanvas } from "./EditorCanvas";
 import { PropertyPanel } from "./PropertyPanel";
 import { CodePanel } from "./CodePanel";
+import { ElementPalette } from "./ElementPalette";
 
 type BottomPanel = "code" | null;
 
@@ -18,16 +19,47 @@ export function EditorLayout() {
     saveToDisk();
   }, [saveToDisk]);
 
-  // Ctrl+S to save
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      // Don't handle shortcuts when typing in inputs/textareas
+      const tag = (e.target as HTMLElement).tagName;
+      const isInput = tag === "INPUT" || tag === "TEXTAREA";
+
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
         handleSave();
+        return;
       }
       if (e.key === "F5") {
         e.preventDefault();
         setPresenting(true);
+        return;
+      }
+
+      // Skip remaining shortcuts if typing in an input
+      if (isInput) return;
+
+      // Undo: Ctrl+Z
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "z") {
+        e.preventDefault();
+        useDeckStore.temporal.getState().undo();
+        return;
+      }
+      // Redo: Ctrl+Shift+Z or Ctrl+Y
+      if ((e.ctrlKey || e.metaKey) && (e.shiftKey && e.key === "Z" || e.key === "y")) {
+        e.preventDefault();
+        useDeckStore.temporal.getState().redo();
+        return;
+      }
+      // Delete selected element
+      if (e.key === "Delete" || e.key === "Backspace") {
+        const { deck, currentSlideIndex, selectedElementId, deleteElement } = useDeckStore.getState();
+        if (deck && selectedElementId) {
+          const slide = deck.slides[currentSlideIndex];
+          if (slide) deleteElement(slide.id, selectedElementId);
+        }
+        return;
       }
     };
     window.addEventListener("keydown", handleKey);
@@ -50,6 +82,25 @@ export function EditorLayout() {
         </span>
 
         <div className="flex-1" />
+
+        <button
+          onClick={() => useDeckStore.temporal.getState().undo()}
+          className="text-xs px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+          title="Undo (Ctrl+Z)"
+        >
+          Undo
+        </button>
+        <button
+          onClick={() => useDeckStore.temporal.getState().redo()}
+          className="text-xs px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+          title="Redo (Ctrl+Shift+Z)"
+        >
+          Redo
+        </button>
+
+        <div className="w-px h-5 bg-zinc-700" />
+
+        <ElementPalette />
 
         <button
           onClick={handleSave}
@@ -180,7 +231,7 @@ function SlideViewerPresentation() {
 
   return (
     <div className="h-full w-full flex items-center justify-center bg-black cursor-none">
-      <div style={{ width: CANVAS_WIDTH * scale, height: CANVAS_HEIGHT * scale }}>
+      <div>
         <AnimatePresence mode="wait">
           <motion.div
             key={slide.id}

@@ -34,11 +34,7 @@ export function EditorCanvas() {
   const slide = deck.slides[currentSlideIndex];
   assert(slide !== undefined, `Slide index ${currentSlideIndex} out of bounds`);
 
-  const scaledW = CANVAS_WIDTH * scale;
-  const scaledH = CANVAS_HEIGHT * scale;
-
   const handleCanvasClick = (e: React.MouseEvent) => {
-    // Only deselect if clicking on the canvas background (not an element)
     if (e.target === e.currentTarget) {
       selectElement(null);
     }
@@ -50,7 +46,7 @@ export function EditorCanvas() {
       className="flex-1 flex items-center justify-center bg-zinc-900 overflow-hidden"
       onClick={handleCanvasClick}
     >
-      <div className="relative" style={{ width: scaledW, height: scaledH }}>
+      <div className="relative">
         <SlideRenderer slide={slide} scale={scale} />
         <SelectionOverlay slide={slide} scale={scale} />
       </div>

@@ -76,12 +76,9 @@ export function SlideViewer() {
   const variant = transitionVariants[transition.type] ?? transitionVariants.fade;
   const duration = (transition.duration ?? 300) / 1000;
 
-  const scaledWidth = CANVAS_WIDTH * scale;
-  const scaledHeight = CANVAS_HEIGHT * scale;
-
   return (
     <div ref={containerRef} className="h-full w-full flex items-center justify-center bg-zinc-950 overflow-hidden">
-      <div style={{ width: scaledWidth, height: scaledHeight }} className="relative">
+      <div className="relative">
         <AnimatePresence mode="wait">
           <motion.div
             key={slide.id}
