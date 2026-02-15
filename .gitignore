@@ -3,3 +3,6 @@ dist
 *.local
 
 *.tsbuildinfo
+
+# Runtime data (auto-saved by editor)
+deck.json
