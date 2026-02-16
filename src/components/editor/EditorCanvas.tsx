@@ -57,7 +57,9 @@ export function EditorCanvas() {
     const isVideo = file.type.startsWith("video/");
     if (!isImage && !isVideo) return;
 
-    const url = await uploadAsset(file);
+    const currentProject = useDeckStore.getState().currentProject;
+    assert(currentProject !== null, "No project open");
+    const url = await uploadAsset(file, currentProject);
 
     const wrapper = canvasWrapperRef.current;
     assert(wrapper !== null, "canvasWrapperRef not attached");

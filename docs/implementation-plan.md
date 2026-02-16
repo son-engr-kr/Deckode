@@ -124,17 +124,21 @@ Run `npm run dev`, see a rendered slide from `deck.json`.
 
 ### Goals
 
-- [ ] Support multiple projects inside the `project/` directory (e.g., `project/project1/`, `project/project2/`)
-- [ ] Each sub-project contains its own `deck.json` and `assets/` folder
-- [ ] Project selector UI to switch between projects
-- [ ] API endpoints accept a project name parameter to load/save the correct project
-- [ ] Creating a new project initializes a fresh sub-directory with an empty deck
+- [X] Support multiple projects inside the `projects/` directory (e.g., `projects/my-slides/`, `projects/conference-talk/`)
+- [X] Each sub-project contains its own `deck.json` and `assets/` folder
+- [X] Project selector UI to switch between projects
+- [X] API endpoints accept a `?project=name` parameter to load/save the correct project
+- [X] Creating a new project initializes a fresh sub-directory from `templates/default/deck.json`
+- [X] Legacy migration: flat `projects/deck.json` auto-migrated to `projects/default/`
+- [X] Asset URLs rewritten during migration (`/assets/foo` → `/assets/default/foo`)
+- [X] URL sync: `?project=name` in browser URL auto-opens the project on refresh
 
 ### Key Decisions
 
-- The `project/` directory becomes a workspace containing multiple independent presentations.
+- The `projects/` directory becomes a workspace containing multiple independent presentations.
 - Each sub-project is fully portable — copy a sub-directory to move a presentation.
-- Structure: `project/{name}/deck.json` and `project/{name}/assets/`
+- Structure: `projects/{name}/deck.json` and `projects/{name}/assets/`
+- Asset URL scheme: `/assets/{project}/{filename}` maps to `projects/{project}/assets/{filename}`
 
 ---
 

@@ -84,7 +84,16 @@ export function EditorLayout() {
     <div className="h-screen w-screen flex flex-col bg-zinc-950 text-white">
       {/* Toolbar */}
       <div className="h-10 border-b border-zinc-800 flex items-center px-4 gap-4 shrink-0">
-        <span className="text-sm font-semibold text-zinc-300">Deckode</span>
+        <button
+          onClick={() => useDeckStore.getState().closeProject()}
+          className="text-xs px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+          title="Back to projects"
+        >
+          Projects
+        </button>
+        <span className="text-sm font-semibold text-zinc-300">
+          {useDeckStore.getState().currentProject}
+        </span>
 
         {/* Save status */}
         <span className="text-xs text-zinc-500">

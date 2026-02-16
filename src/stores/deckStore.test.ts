@@ -32,11 +32,46 @@ function makeDeck(slideCount = 3): Deck {
 // Reset store before each test
 beforeEach(() => {
   useDeckStore.setState({
+    currentProject: null,
     deck: null,
     currentSlideIndex: 0,
     selectedElementId: null,
     isDirty: false,
     isSaving: false,
+  });
+});
+
+// ============================================================
+// openProject / closeProject
+// ============================================================
+
+describe("deckStore - openProject / closeProject", () => {
+  it("openProject sets currentProject and loads deck", () => {
+    const deck = makeDeck();
+    useDeckStore.getState().openProject("my-slides", deck);
+
+    const state = useDeckStore.getState();
+    expect(state.currentProject).toBe("my-slides");
+    assert(state.deck !== null, "deck should be loaded");
+    expect(state.deck.slides).toHaveLength(3);
+    expect(state.currentSlideIndex).toBe(0);
+    expect(state.selectedElementId).toBeNull();
+    expect(state.isDirty).toBe(false);
+  });
+
+  it("closeProject clears all state", () => {
+    useDeckStore.getState().openProject("my-slides", makeDeck());
+    useDeckStore.getState().setCurrentSlide(2);
+    useDeckStore.getState().selectElement("e2-0");
+
+    useDeckStore.getState().closeProject();
+
+    const state = useDeckStore.getState();
+    expect(state.currentProject).toBeNull();
+    expect(state.deck).toBeNull();
+    expect(state.currentSlideIndex).toBe(0);
+    expect(state.selectedElementId).toBeNull();
+    expect(state.isDirty).toBe(false);
   });
 });
 

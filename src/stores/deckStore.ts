@@ -7,12 +7,15 @@ import { saveDeckToDisk } from "@/utils/api";
 import { nextElementId } from "@/utils/id";
 
 interface DeckState {
+  currentProject: string | null;
   deck: Deck | null;
   currentSlideIndex: number;
   selectedElementId: string | null;
   isDirty: boolean;
   isSaving: boolean;
 
+  openProject: (project: string, deck: Deck) => void;
+  closeProject: () => void;
   loadDeck: (deck: Deck) => void;
   replaceDeck: (deck: Deck) => void;
   saveToDisk: () => Promise<void>;
@@ -34,11 +37,30 @@ export const useDeckStore = create<DeckState>()(
   subscribeWithSelector(
     temporal(
       immer((set, get) => ({
+        currentProject: null,
         deck: null,
         currentSlideIndex: 0,
         selectedElementId: null,
         isDirty: false,
         isSaving: false,
+
+        openProject: (project, deck) =>
+          set((state) => {
+            state.currentProject = project;
+            state.deck = deck;
+            state.currentSlideIndex = 0;
+            state.selectedElementId = null;
+            state.isDirty = false;
+          }),
+
+        closeProject: () =>
+          set((state) => {
+            state.currentProject = null;
+            state.deck = null;
+            state.currentSlideIndex = 0;
+            state.selectedElementId = null;
+            state.isDirty = false;
+          }),
 
         loadDeck: (deck) =>
           set((state) => {
@@ -59,10 +81,10 @@ export const useDeckStore = create<DeckState>()(
           }),
 
         saveToDisk: async () => {
-          const { deck, isSaving } = get();
-          if (!deck || isSaving) return;
+          const { deck, isSaving, currentProject } = get();
+          if (!deck || isSaving || !currentProject) return;
           set((state) => { state.isSaving = true; });
-          await saveDeckToDisk(deck);
+          await saveDeckToDisk(deck, currentProject);
           set((state) => { state.isSaving = false; state.isDirty = false; });
         },
 
