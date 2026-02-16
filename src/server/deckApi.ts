@@ -5,6 +5,19 @@ import path from "path";
 import Ajv2020 from "ajv/dist/2020";
 
 const DECK_FILENAME = "deck.json";
+const PROJECT_DIR = "projects";
+
+const MIME_TYPES: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml",
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
+  ".mov": "video/quicktime",
+};
 
 function loadSchema() {
   const schemaPath = path.resolve(process.cwd(), "src/schema/deck.schema.json");
@@ -21,6 +34,14 @@ function readBody(req: IncomingMessage): Promise<string> {
     let body = "";
     req.on("data", (chunk: Buffer) => { body += chunk.toString(); });
     req.on("end", () => resolve(body));
+  });
+}
+
+function readBinaryBody(req: IncomingMessage): Promise<Buffer> {
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => { chunks.push(chunk); });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
   });
 }
 
@@ -48,7 +69,8 @@ function jsonResponse(res: ServerResponse, status: number, data: unknown) {
  *   GET  /api/ai/tools           — List available AI tools with schemas
  */
 export function deckApiPlugin(): Plugin {
-  const deckPath = () => path.resolve(process.cwd(), DECK_FILENAME);
+  const projectDir = () => path.resolve(process.cwd(), PROJECT_DIR);
+  const deckPath = () => path.resolve(projectDir(), DECK_FILENAME);
   let validate: ReturnType<typeof createValidator>;
   let viteServer: Parameters<NonNullable<Plugin["configureServer"]>>[0];
 
@@ -62,6 +84,60 @@ export function deckApiPlugin(): Plugin {
     configureServer(server) {
       viteServer = server;
       validate = createValidator();
+
+      // -- Migrate legacy root-level files into project/ --
+      migrateToProjectDir(projectDir());
+
+      // -- Static serving: /assets/* --
+
+      const assetsDir = path.resolve(projectDir(), "assets");
+
+      server.middlewares.use("/assets", (req, res, next) => {
+        const urlPath = decodeURIComponent(req.url ?? "/");
+        const filePath = path.resolve(assetsDir, urlPath.replace(/^\//, ""));
+        assert(filePath.startsWith(assetsDir), "Path traversal blocked");
+        if (!fs.existsSync(filePath)) { next(); return; }
+        const ext = path.extname(filePath).toLowerCase();
+        const mime = MIME_TYPES[ext];
+        if (!mime) { next(); return; }
+        res.writeHead(200, {
+          "Content-Type": mime,
+          "Cache-Control": "no-cache",
+        });
+        fs.createReadStream(filePath).pipe(res);
+      });
+
+      // -- Upload asset --
+
+      server.middlewares.use("/api/upload-asset", async (req, res) => {
+        if (req.method !== "POST") { jsonResponse(res, 405, { error: "POST only" }); return; }
+        const contentType = req.headers["content-type"] ?? "";
+        assert(
+          contentType.startsWith("image/") || contentType.startsWith("video/"),
+          `Unsupported content type: ${contentType}`,
+        );
+        const rawFilename = req.headers["x-filename"];
+        assert(typeof rawFilename === "string" && rawFilename.length > 0, "Missing X-Filename header");
+        const filename = decodeURIComponent(rawFilename);
+
+        if (!fs.existsSync(assetsDir)) {
+          fs.mkdirSync(assetsDir, { recursive: true });
+        }
+
+        // Deduplicate filename
+        const ext = path.extname(filename);
+        const base = path.basename(filename, ext);
+        let finalName = filename;
+        let counter = 0;
+        while (fs.existsSync(path.resolve(assetsDir, finalName))) {
+          counter++;
+          finalName = `${base}-${counter}${ext}`;
+        }
+
+        const buffer = await readBinaryBody(req);
+        fs.writeFileSync(path.resolve(assetsDir, finalName), buffer);
+        jsonResponse(res, 200, { url: `/assets/${finalName}` });
+      });
 
       // -- Editor endpoints --
 
@@ -83,7 +159,10 @@ export function deckApiPlugin(): Plugin {
         }
         const body = await readBody(req);
         JSON.parse(body); // crash on invalid JSON (fail-fast)
-        fs.writeFileSync(deckPath(), body, "utf-8");
+        const dp = deckPath();
+        const dir = path.dirname(dp);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(dp, body, "utf-8");
         jsonResponse(res, 200, { ok: true });
       });
 
@@ -112,7 +191,7 @@ export function deckApiPlugin(): Plugin {
           jsonResponse(res, 400, { error: "Schema validation failed", details: validate.errors });
           return;
         }
-        fs.writeFileSync(deckPath(), JSON.stringify(deck, null, 2), "utf-8");
+        saveDeck(deckPath(), deck);
         notifyDeckChanged();
         jsonResponse(res, 200, { ok: true, slides: deck.slides.length });
       });
@@ -239,11 +318,42 @@ function loadDeck(filePath: string): any | null {
 }
 
 function saveDeck(filePath: string, deck: any) {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
   fs.writeFileSync(filePath, JSON.stringify(deck, null, 2), "utf-8");
 }
 
 function assert(condition: any, message: string): asserts condition {
   if (!condition) throw new Error(message);
+}
+
+/** Migrate legacy root-level deck.json and assets/ into project/ */
+function migrateToProjectDir(projectDir: string) {
+  const cwd = process.cwd();
+  const legacyDeck = path.resolve(cwd, DECK_FILENAME);
+  const legacyAssets = path.resolve(cwd, "assets");
+
+  if (!fs.existsSync(legacyDeck) && !fs.existsSync(legacyAssets)) return;
+
+  if (!fs.existsSync(projectDir)) {
+    fs.mkdirSync(projectDir, { recursive: true });
+  }
+
+  if (fs.existsSync(legacyDeck)) {
+    const dest = path.resolve(projectDir, DECK_FILENAME);
+    fs.renameSync(legacyDeck, dest);
+    console.log(`[deckode] Migrated ${DECK_FILENAME} → ${PROJECT_DIR}/${DECK_FILENAME}`);
+  }
+
+  if (fs.existsSync(legacyAssets) && fs.statSync(legacyAssets).isDirectory()) {
+    const dest = path.resolve(projectDir, "assets");
+    // cpSync + rmSync instead of renameSync: Windows blocks renameSync on watched dirs
+    fs.cpSync(legacyAssets, dest, { recursive: true });
+    fs.rmSync(legacyAssets, { recursive: true, force: true });
+    console.log(`[deckode] Migrated assets/ → ${PROJECT_DIR}/assets/`);
+  }
 }
 
 // -- AI Tools Manifest --

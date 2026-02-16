@@ -13,7 +13,9 @@ export default defineConfig({
   },
   server: {
     watch: {
-      ignored: [path.resolve(__dirname, "deck.json")],
+      ignored: [
+        path.resolve(__dirname, "projects/**"),
+      ],
     },
   },
   test: {

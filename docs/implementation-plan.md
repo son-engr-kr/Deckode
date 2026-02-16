@@ -4,7 +4,7 @@
 
 **Problem:** Existing tools are either too restrictive/vendor-locked (Gamma), too complex for non-developers (Slidev/LaTeX), or produce low-quality output from PPTX-based automation with limited web-native capabilities.
 
-**Mission:** Build an **open-source, AI-first slide platform** that combines block-editor simplicity with developer-stack power (React, LaTeX, Tailwind).
+**Mission:** Build an **open-source, AI-first slide platform** that combines block-editor simplicity th developer-stack power (React, LaTeX, Tailwind).
 
 **Target Users:** STEM researchers, engineers, and high-end agency designers who need both precision and aesthetics.
 
@@ -107,6 +107,7 @@ Run `npm run dev`, see a rendered slide from `deck.json`.
 - [X] Add/delete slides (sidebar + button, hover delete)
 - [X] Add/delete elements (toolbar palette: text, image, shape, code)
 - [X] Undo/redo (zundo temporal middleware, Ctrl+Z / Ctrl+Shift+Z, toolbar buttons)
+  - [ ] **Bug:** Undo/redo affects the entire deck state, so undoing on one slide can revert changes made on a different slide. Undo should be scoped per-slide.
 - [X] Keyboard shortcuts (Delete/Backspace, Ctrl+Z, Ctrl+Shift+Z, Ctrl+S, F5)
 - [ ] Slide reordering via drag-and-drop in sidebar
 - [ ] Element resize handles (drag corners to resize, update `size` in store)
@@ -116,6 +117,24 @@ Run `npm run dev`, see a rendered slide from `deck.json`.
 
 - Editor canvas and presentation renderer share the same `SlideRenderer` component. Editor adds an overlay layer for selection/drag handles.
 - All edits go through Zustand actions. No direct DOM manipulation.
+
+---
+
+## Phase 2.5: Multi-Project Support
+
+### Goals
+
+- [ ] Support multiple projects inside the `project/` directory (e.g., `project/project1/`, `project/project2/`)
+- [ ] Each sub-project contains its own `deck.json` and `assets/` folder
+- [ ] Project selector UI to switch between projects
+- [ ] API endpoints accept a project name parameter to load/save the correct project
+- [ ] Creating a new project initializes a fresh sub-directory with an empty deck
+
+### Key Decisions
+
+- The `project/` directory becomes a workspace containing multiple independent presentations.
+- Each sub-project is fully portable — copy a sub-directory to move a presentation.
+- Structure: `project/{name}/deck.json` and `project/{name}/assets/`
 
 ---
 

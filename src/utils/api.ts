@@ -15,6 +15,20 @@ export async function saveDeckToDisk(deck: Deck): Promise<void> {
   assert(res.ok, `Failed to save deck: ${res.status}`);
 }
 
+export async function uploadAsset(file: File): Promise<string> {
+  const res = await fetch("/api/upload-asset", {
+    method: "POST",
+    headers: {
+      "Content-Type": file.type,
+      "X-Filename": encodeURIComponent(file.name),
+    },
+    body: file,
+  });
+  assert(res.ok, `Failed to upload asset: ${res.status}`);
+  const data = await res.json();
+  return data.url;
+}
+
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(`[API] ${message}`);
 }

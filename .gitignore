@@ -5,4 +5,4 @@ dist
 *.tsbuildinfo
 
 # Runtime data (auto-saved by editor)
-deck.json
+projects/

@@ -11,9 +11,10 @@ import { VideoElementRenderer } from "./elements/VideoElement";
 interface Props {
   element: SlideElement;
   animations?: Animation[];
+  thumbnail?: boolean;
 }
 
-export function ElementRenderer({ element, animations }: Props) {
+export function ElementRenderer({ element, animations, thumbnail }: Props) {
   const transform = element.rotation ? `rotate(${element.rotation}deg)` : undefined;
 
   const positionStyle: React.CSSProperties = {
@@ -24,7 +25,7 @@ export function ElementRenderer({ element, animations }: Props) {
     transform,
   };
 
-  const child = renderByType(element);
+  const child = renderByType(element, thumbnail);
 
   // No animations → plain div (zero overhead in editor)
   if (!animations || animations.length === 0) {
@@ -103,7 +104,7 @@ function AnimatedWrapper({
   );
 }
 
-function renderByType(element: SlideElement) {
+function renderByType(element: SlideElement, thumbnail?: boolean) {
   switch (element.type) {
     case "text":
       return <TextElementRenderer element={element} />;
@@ -114,6 +115,6 @@ function renderByType(element: SlideElement) {
     case "shape":
       return <ShapeElementRenderer element={element} />;
     case "video":
-      return <VideoElementRenderer element={element} />;
+      return <VideoElementRenderer element={element} thumbnail={thumbnail} />;
   }
 }

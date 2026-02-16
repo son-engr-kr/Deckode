@@ -2,6 +2,7 @@ import type { VideoElement as VideoElementType } from "@/types/deck";
 
 interface Props {
   element: VideoElementType;
+  thumbnail?: boolean;
 }
 
 function parseVideoUrl(src: string): { type: "youtube" | "vimeo" | "native"; embedUrl: string } {
@@ -22,9 +23,8 @@ function parseVideoUrl(src: string): { type: "youtube" | "vimeo" | "native"; emb
   return { type: "native", embedUrl: src };
 }
 
-export function VideoElementRenderer({ element }: Props) {
+export function VideoElementRenderer({ element, thumbnail }: Props) {
   const style = element.style ?? {};
-  const { type, embedUrl } = parseVideoUrl(element.src);
 
   const commonStyle: React.CSSProperties = {
     width: element.size.w,
@@ -32,6 +32,21 @@ export function VideoElementRenderer({ element }: Props) {
     objectFit: (style.objectFit ?? "contain") as React.CSSProperties["objectFit"],
     borderRadius: style.borderRadius ?? 0,
   };
+
+  // Thumbnail mode: static placeholder, no video loading
+  if (thumbnail) {
+    return (
+      <div
+        style={{ ...commonStyle, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#18181b" }}
+      >
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#71717a" strokeWidth="2">
+          <polygon points="5,3 19,12 5,21" />
+        </svg>
+      </div>
+    );
+  }
+
+  const { type, embedUrl } = parseVideoUrl(element.src);
 
   if (type === "youtube" || type === "vimeo") {
     const params = new URLSearchParams();

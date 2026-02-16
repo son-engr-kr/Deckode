@@ -148,7 +148,7 @@ function SortableSlideItem({
         }`}
       >
         <div className="rounded-sm overflow-hidden pointer-events-none">
-          <SlideRenderer slide={slide} scale={THUMB_SCALE} />
+          <SlideRenderer slide={slide} scale={THUMB_SCALE} thumbnail />
         </div>
         <span className="absolute bottom-0.5 right-1.5 text-[10px] text-zinc-500 font-mono">
           {index + 1}

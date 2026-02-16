@@ -1,6 +1,7 @@
 import { useRef, useCallback } from "react";
 import { useDeckStore } from "@/stores/deckStore";
 import type { Slide, SlideElement } from "@/types/deck";
+import { CANVAS_HEIGHT } from "@/types/deck";
 
 interface Props {
   slide: Slide;
@@ -15,7 +16,7 @@ export function SelectionOverlay({ slide, scale }: Props) {
   return (
     <div
       className="absolute inset-0"
-      style={{ transform: `scale(${scale})`, transformOrigin: "top left" }}
+      style={{ transform: `scale(${scale})`, transformOrigin: "top left", pointerEvents: "none" }}
     >
       {slide.elements.map((element) => (
         <InteractiveElement
@@ -77,20 +78,22 @@ function InteractiveElement({ element, isSelected, onSelect, onMove, onResize, s
         ey: element.position.y,
       };
 
+      const handleMouseUp = () => {
+        dragStart.current = null;
+        window.removeEventListener("mousemove", handleMouseMove);
+        window.removeEventListener("mouseup", handleMouseUp);
+      };
+
       const handleMouseMove = (me: MouseEvent) => {
         if (!dragStart.current) return;
+        // Safety: button already released but mouseup was swallowed (e.g. by <video> controls)
+        if (me.buttons === 0) { handleMouseUp(); return; }
         const dx = (me.clientX - dragStart.current.x) / scale;
         const dy = (me.clientY - dragStart.current.y) / scale;
         onMove(
           Math.round(dragStart.current.ex + dx - element.position.x),
           Math.round(dragStart.current.ey + dy - element.position.y),
         );
-      };
-
-      const handleMouseUp = () => {
-        dragStart.current = null;
-        window.removeEventListener("mousemove", handleMouseMove);
-        window.removeEventListener("mouseup", handleMouseUp);
       };
 
       window.addEventListener("mousemove", handleMouseMove);
@@ -109,7 +112,13 @@ function InteractiveElement({ element, isSelected, onSelect, onMove, onResize, s
       const origW = element.size.w;
       const origH = element.size.h;
 
+      const handleMouseUp = () => {
+        window.removeEventListener("mousemove", handleMouseMove);
+        window.removeEventListener("mouseup", handleMouseUp);
+      };
+
       const handleMouseMove = (me: MouseEvent) => {
+        if (me.buttons === 0) { handleMouseUp(); return; }
         const rawDx = (me.clientX - startX) / scale;
         const rawDy = (me.clientY - startY) / scale;
 
@@ -151,11 +160,6 @@ function InteractiveElement({ element, isSelected, onSelect, onMove, onResize, s
         );
       };
 
-      const handleMouseUp = () => {
-        window.removeEventListener("mousemove", handleMouseMove);
-        window.removeEventListener("mouseup", handleMouseUp);
-      };
-
       window.addEventListener("mousemove", handleMouseMove);
       window.addEventListener("mouseup", handleMouseUp);
     },
@@ -172,11 +176,19 @@ function InteractiveElement({ element, isSelected, onSelect, onMove, onResize, s
         top: element.position.y,
         width: element.size.w,
         height: element.size.h,
+        // auto: re-enable events (parent is pointer-events:none)
+        // Selected video: let clicks pass through to native <video> controls
+        pointerEvents: element.type === "video" && isSelected ? "none" : "auto",
       }}
       onMouseDown={handleMouseDown}
     >
       {/* Transparent overlay to capture mouse events */}
       <div className="absolute inset-0" />
+
+      {/* Selected video: drag handle on the side closer to canvas center */}
+      {element.type === "video" && isSelected && (
+        <VideoDragHandle element={element} onMouseDown={handleMouseDown} />
+      )}
 
       {/* Resize handles (when selected) */}
       {isSelected && (
@@ -198,6 +210,40 @@ const HANDLE_POSITIONS: Record<Corner, string> = {
   se: "-bottom-1 -right-1 cursor-se-resize",
 };
 
+function VideoDragHandle({
+  element,
+  onMouseDown,
+}: {
+  element: SlideElement;
+  onMouseDown: (e: React.MouseEvent) => void;
+}) {
+  // Place handle on whichever side (top/bottom) is closer to the canvas center
+  const centerY = element.position.y + element.size.h / 2;
+  const handleOnTop = centerY > CANVAS_HEIGHT / 2;
+
+  return (
+    <div
+      className={`absolute left-1/2 -translate-x-1/2 flex items-center justify-center
+        w-16 h-5 rounded-full bg-zinc-700/80 cursor-move hover:bg-zinc-600/90 z-10`}
+      style={{
+        pointerEvents: "auto",
+        ...(handleOnTop ? { top: -28 } : { bottom: -28 }),
+      }}
+      onMouseDown={onMouseDown}
+    >
+      {/* Grip dots */}
+      <svg width="20" height="6" viewBox="0 0 20 6" fill="currentColor" className="text-zinc-300">
+        <circle cx="4" cy="1.5" r="1.5" />
+        <circle cx="10" cy="1.5" r="1.5" />
+        <circle cx="16" cy="1.5" r="1.5" />
+        <circle cx="4" cy="4.5" r="1.5" />
+        <circle cx="10" cy="4.5" r="1.5" />
+        <circle cx="16" cy="4.5" r="1.5" />
+      </svg>
+    </div>
+  );
+}
+
 function ResizeHandle({
   corner,
   onMouseDown,
@@ -208,6 +254,7 @@ function ResizeHandle({
   return (
     <div
       className={`absolute w-2.5 h-2.5 bg-blue-500 rounded-full ${HANDLE_POSITIONS[corner]}`}
+      style={{ pointerEvents: "auto" }}
       onMouseDown={(e) => onMouseDown(e, corner)}
     />
   );

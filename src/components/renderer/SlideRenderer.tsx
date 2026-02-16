@@ -7,9 +7,10 @@ interface Props {
   slide: Slide;
   scale: number;
   animate?: boolean;
+  thumbnail?: boolean;
 }
 
-export function SlideRenderer({ slide, scale, animate }: Props) {
+export function SlideRenderer({ slide, scale, animate, thumbnail }: Props) {
   const bg = slide.background;
 
   // Build element→animations lookup only when animating
@@ -56,6 +57,7 @@ export function SlideRenderer({ slide, scale, animate }: Props) {
             key={element.id}
             element={element}
             animations={animationMap?.get(element.id)}
+            thumbnail={thumbnail}
           />
         ))}
       </div>
