@@ -1,12 +1,14 @@
-import type { TextElement as TextElementType } from "@/types/deck";
+import type { TextElement as TextElementType, TextStyle } from "@/types/deck";
 import { renderMarkdown } from "@/utils/markdown";
+import { useTheme, resolveStyle } from "@/contexts/ThemeContext";
 
 interface Props {
   element: TextElementType;
 }
 
 export function TextElementRenderer({ element }: Props) {
-  const style = element.style ?? {};
+  const theme = useTheme();
+  const style = resolveStyle<TextStyle>(theme.text, element.style);
   const verticalAlign = style.verticalAlign ?? "top";
   const alignItems = { top: "flex-start", middle: "center", bottom: "flex-end" }[verticalAlign];
 

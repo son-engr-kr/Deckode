@@ -162,18 +162,30 @@ export interface Slide {
   animations?: Animation[];
 }
 
+// ----- Theme -----
+
+export interface DeckTheme {
+  slide?: { background?: SlideBackground };
+  text?: Partial<TextStyle>;
+  code?: Partial<CodeStyle>;
+  shape?: Partial<ShapeStyle>;
+  image?: Partial<ImageStyle>;
+  video?: Partial<VideoStyle>;
+  tikz?: Partial<TikZStyle>;
+}
+
 // ----- Deck (top-level) -----
 
 export interface DeckMeta {
   title: string;
   author?: string;
   aspectRatio: "16:9" | "4:3";
-  theme?: string;
 }
 
 export interface Deck {
   deckode: string;
   meta: DeckMeta;
+  theme?: DeckTheme;
   slides: Slide[];
 }
 

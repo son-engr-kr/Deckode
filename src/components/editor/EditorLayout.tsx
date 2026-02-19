@@ -7,6 +7,7 @@ import { PropertyPanel } from "./PropertyPanel";
 import { CodePanel } from "./CodePanel";
 import { ElementPalette } from "./ElementPalette";
 import { SlideAnimationList } from "./SlideAnimationList";
+import { ThemePanel } from "./ThemePanel";
 
 function performUndoRedo(direction: "undo" | "redo") {
   const temporal = useDeckStore.temporal.getState();
@@ -29,9 +30,11 @@ function performUndoRedo(direction: "undo" | "redo") {
 }
 
 type BottomPanel = "code" | null;
+type RightPanel = "properties" | "theme";
 
 export function EditorLayout() {
   const [bottomPanel, setBottomPanel] = useState<BottomPanel>(null);
+  const [rightPanel, setRightPanel] = useState<RightPanel>("properties");
   const [presenting, setPresenting] = useState(false);
   const isDirty = useDeckStore((s) => s.isDirty);
   const isSaving = useDeckStore((s) => s.isSaving);
@@ -157,6 +160,16 @@ export function EditorLayout() {
           Present (F5)
         </button>
         <button
+          onClick={() => setRightPanel(rightPanel === "theme" ? "properties" : "theme")}
+          className={`text-xs px-2 py-1 rounded transition-colors ${
+            rightPanel === "theme"
+              ? "bg-blue-600 text-white"
+              : "bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+          }`}
+        >
+          Theme
+        </button>
+        <button
           onClick={() => setBottomPanel(bottomPanel === "code" ? null : "code")}
           className={`text-xs px-2 py-1 rounded transition-colors ${
             bottomPanel === "code"
@@ -186,20 +199,28 @@ export function EditorLayout() {
           )}
         </div>
 
-        {/* Right: properties (top) + animations (bottom) */}
+        {/* Right sidebar */}
         <div className="w-[240px] border-l border-zinc-800 flex flex-col shrink-0">
-          {/* Properties — top half */}
-          <div className="flex-1 overflow-y-auto border-b border-zinc-800">
-            <PropertyPanel />
-          </div>
-          {/* Animations — bottom half */}
-          <div className="flex-1 overflow-y-auto">
-            <SlideAnimationList
-              onSelectElement={(elementId) => {
-                useDeckStore.getState().selectElement(elementId);
-              }}
-            />
-          </div>
+          {rightPanel === "theme" ? (
+            <div className="flex-1 overflow-y-auto">
+              <ThemePanel />
+            </div>
+          ) : (
+            <>
+              {/* Properties — top half */}
+              <div className="flex-1 overflow-y-auto border-b border-zinc-800">
+                <PropertyPanel />
+              </div>
+              {/* Animations — bottom half */}
+              <div className="flex-1 overflow-y-auto">
+                <SlideAnimationList
+                  onSelectElement={(elementId) => {
+                    useDeckStore.getState().selectElement(elementId);
+                  }}
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -333,6 +354,7 @@ function SlideViewerPresentation({
               activeStep={activeStep}
               onClickSteps={steps}
               onAdvance={onAdvance}
+              theme={deck?.theme}
             />
           </motion.div>
         </AnimatePresence>

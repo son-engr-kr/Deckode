@@ -197,6 +197,26 @@ Run `npm run dev`, see a rendered slide from `deck.json`.
 
 ---
 
+## Phase 5.5: File System Access API Migration
+
+### Goals
+
+- [ ] Abstract file I/O behind an adapter interface (`FileSystemAdapter`)
+- [ ] Implement `FsAccessAdapter` using the File System Access API (`showDirectoryPicker`, `FileSystemFileHandle`, `FileSystemDirectoryHandle`)
+- [ ] Replace Vite plugin API endpoints (`/api/save-deck`, `/api/load-deck`, `/api/upload-asset`) with adapter calls
+- [ ] Project open flow: user picks a local folder via OS directory picker → app reads `deck.json` and assets directly
+- [ ] Persist directory handle across page reloads (IndexedDB) to avoid re-prompting
+- [ ] WASM TeX engine for TikZ rendering (eliminate server-side LaTeX dependency, enable fully client-side operation)
+- [ ] Static deployment to GitHub Pages — zero backend, fully browser-native
+
+### Key Decisions
+
+- File System Access API is Chrome/Edge only. Firefox/Safari users will need a polyfill or fallback (future consideration).
+- Vite remains as dev server for HMR during development, but no longer handles file I/O.
+- With WASM TeX + File System Access API, the app becomes fully self-contained in the browser.
+
+---
+
 ## Phase 6: AI Agent Integration
 
 ### Goals

@@ -29,8 +29,16 @@ A Deckode presentation is a single `deck.json` file. It is a JSON scene graph: a
   "meta": {
     "title": "Presentation Title",
     "author": "Author Name",
-    "aspectRatio": "16:9",
-    "theme": "default"
+    "aspectRatio": "16:9"
+  },
+  "theme": {
+    "slide": { "background": { "color": "#0f172a" } },
+    "text": { "fontFamily": "Inter, system-ui, sans-serif", "fontSize": 24, "color": "#ffffff" },
+    "code": { "theme": "github-dark", "fontSize": 16 },
+    "shape": { "stroke": "#ffffff", "strokeWidth": 1 },
+    "image": { "objectFit": "contain" },
+    "video": { "objectFit": "contain" },
+    "tikz": { "backgroundColor": "#1e1e2e" }
   },
   "slides": [ ... ]
 }
@@ -42,7 +50,7 @@ A Deckode presentation is a single `deck.json` file. It is a JSON scene graph: a
 | `meta.title` | string | yes | Presentation title |
 | `meta.author` | string | no | Author name |
 | `meta.aspectRatio` | `"16:9"` \| `"4:3"` | yes | Slide aspect ratio |
-| `meta.theme` | string | no | Theme name. Default: `"default"` |
+| `theme` | object | no | Deck-level default styles (see Theme section below) |
 
 ### Slide Object
 
@@ -274,6 +282,36 @@ Animations are defined per-slide and reference elements by ID.
 
 ---
 
+## Theme
+
+The optional top-level `theme` object provides default styles per element type. These act as a middle layer between hardcoded defaults and per-element `style` overrides.
+
+**Resolution order**: `element.style` > `deck.theme` > hardcoded defaults
+
+Each key in the theme object corresponds to an element type and accepts the same style fields as that element's `style` property.
+
+| Theme key | Style fields | Hardcoded defaults |
+|-----------|-------------|-------------------|
+| `theme.slide.background` | `color`, `image` | `color: "#0f172a"` |
+| `theme.text` | `fontFamily`, `fontSize`, `color`, `textAlign`, `lineHeight`, `verticalAlign` | `fontFamily: "Inter"`, `fontSize: 24`, `color: "#ffffff"`, `lineHeight: 1.5` |
+| `theme.code` | `theme`, `fontSize`, `lineNumbers`, `borderRadius` | `theme: "github-dark"`, `fontSize: 16`, `borderRadius: 8` |
+| `theme.shape` | `fill`, `stroke`, `strokeWidth`, `borderRadius`, `opacity` | `stroke: "#ffffff"`, `strokeWidth: 1` |
+| `theme.image` | `objectFit`, `borderRadius`, `opacity` | `objectFit: "contain"` |
+| `theme.video` | `objectFit`, `borderRadius` | `objectFit: "contain"` |
+| `theme.tikz` | `backgroundColor`, `borderRadius` | `backgroundColor: "#1e1e2e"` |
+
+To change the default text color for the entire deck to red without touching individual elements:
+
+```json
+{
+  "theme": { "text": { "color": "#ff0000" } }
+}
+```
+
+Elements with an explicit `style.color` will still use their own value.
+
+---
+
 ## Guidelines for AI
 
 ### Creating a New Deck
@@ -335,8 +373,11 @@ When asked to modify an existing deck:
   "meta": {
     "title": "Introduction to Deckode",
     "author": "Son",
-    "aspectRatio": "16:9",
-    "theme": "default"
+    "aspectRatio": "16:9"
+  },
+  "theme": {
+    "slide": { "background": { "color": "#0f172a" } },
+    "text": { "color": "#f8fafc" }
   },
   "slides": [
     {

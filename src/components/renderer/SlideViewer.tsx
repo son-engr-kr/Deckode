@@ -114,6 +114,7 @@ export function SlideViewer() {
               activeStep={activeStep}
               onClickSteps={steps}
               onAdvance={advance}
+              theme={deck.theme}
             />
           </motion.div>
         </AnimatePresence>

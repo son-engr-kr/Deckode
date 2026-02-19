@@ -16,16 +16,86 @@
       "properties": {
         "title": { "type": "string" },
         "author": { "type": "string" },
-        "aspectRatio": { "type": "string", "enum": ["16:9", "4:3"] },
-        "theme": { "type": "string" }
+        "aspectRatio": { "type": "string", "enum": ["16:9", "4:3"] }
       }
     },
+    "theme": { "$ref": "#/$defs/DeckTheme" },
     "slides": {
       "type": "array",
       "items": { "$ref": "#/$defs/Slide" }
     }
   },
   "$defs": {
+    "DeckTheme": {
+      "type": "object",
+      "description": "Deck-level default styles per element type. Element-level style overrides theme.",
+      "properties": {
+        "slide": {
+          "type": "object",
+          "properties": {
+            "background": {
+              "type": "object",
+              "properties": {
+                "color": { "type": "string" },
+                "image": { "type": "string" }
+              }
+            }
+          }
+        },
+        "text": {
+          "type": "object",
+          "properties": {
+            "fontFamily": { "type": "string" },
+            "fontSize": { "type": "number" },
+            "color": { "type": "string" },
+            "textAlign": { "type": "string", "enum": ["left", "center", "right"] },
+            "lineHeight": { "type": "number" },
+            "verticalAlign": { "type": "string", "enum": ["top", "middle", "bottom"] }
+          }
+        },
+        "code": {
+          "type": "object",
+          "properties": {
+            "theme": { "type": "string" },
+            "fontSize": { "type": "number" },
+            "lineNumbers": { "type": "boolean" },
+            "borderRadius": { "type": "number" }
+          }
+        },
+        "shape": {
+          "type": "object",
+          "properties": {
+            "fill": { "type": "string" },
+            "stroke": { "type": "string" },
+            "strokeWidth": { "type": "number" },
+            "borderRadius": { "type": "number" },
+            "opacity": { "type": "number" }
+          }
+        },
+        "image": {
+          "type": "object",
+          "properties": {
+            "objectFit": { "type": "string", "enum": ["contain", "cover", "fill"] },
+            "borderRadius": { "type": "number" },
+            "opacity": { "type": "number" }
+          }
+        },
+        "video": {
+          "type": "object",
+          "properties": {
+            "objectFit": { "type": "string", "enum": ["contain", "cover", "fill"] },
+            "borderRadius": { "type": "number" }
+          }
+        },
+        "tikz": {
+          "type": "object",
+          "properties": {
+            "backgroundColor": { "type": "string" },
+            "borderRadius": { "type": "number" }
+          }
+        }
+      }
+    },
     "Position": {
       "type": "object",
       "required": ["x", "y"],

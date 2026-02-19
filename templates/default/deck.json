@@ -3,8 +3,16 @@
   "meta": {
     "title": "Introduction to Deckode",
     "author": "Son",
-    "aspectRatio": "16:9",
-    "theme": "default"
+    "aspectRatio": "16:9"
+  },
+  "theme": {
+    "slide": { "background": { "color": "#0f172a" } },
+    "text": { "fontFamily": "Inter, system-ui, sans-serif", "fontSize": 24, "color": "#ffffff" },
+    "code": { "theme": "github-dark", "fontSize": 16 },
+    "shape": { "stroke": "#ffffff", "strokeWidth": 1 },
+    "image": { "objectFit": "contain" },
+    "video": { "objectFit": "contain" },
+    "tikz": { "backgroundColor": "#1e1e2e" }
   },
   "slides": [
     {

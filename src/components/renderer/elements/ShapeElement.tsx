@@ -1,11 +1,13 @@
-import type { ShapeElement as ShapeElementType } from "@/types/deck";
+import type { ShapeElement as ShapeElementType, ShapeStyle } from "@/types/deck";
+import { useTheme, resolveStyle } from "@/contexts/ThemeContext";
 
 interface Props {
   element: ShapeElementType;
 }
 
 export function ShapeElementRenderer({ element }: Props) {
-  const style = element.style ?? {};
+  const theme = useTheme();
+  const style = resolveStyle<ShapeStyle>(theme.shape, element.style);
   const { w, h } = element.size;
 
   if (element.shape === "ellipse") {

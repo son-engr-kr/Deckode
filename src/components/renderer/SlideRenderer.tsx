@@ -1,6 +1,7 @@
 import { useMemo } from "react";
-import type { Slide, Animation } from "@/types/deck";
+import type { Slide, Animation, DeckTheme } from "@/types/deck";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/types/deck";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ElementRenderer } from "./ElementRenderer";
 
 interface Props {
@@ -14,10 +15,13 @@ interface Props {
   onClickSteps?: Animation[][];
   /** Called when clicking the slide area — parent uses this to advance step */
   onAdvance?: () => void;
+  /** Deck-level theme for default styles */
+  theme?: DeckTheme;
 }
 
-export function SlideRenderer({ slide, scale, animate, thumbnail, activeStep, onClickSteps, onAdvance }: Props) {
+export function SlideRenderer({ slide, scale, animate, thumbnail, activeStep, onClickSteps, onAdvance, theme }: Props) {
   const bg = slide.background;
+  const themeBgColor = theme?.slide?.background?.color;
 
   // Build element→animations lookup only when animating
   const animationMap = useMemo(() => {
@@ -46,7 +50,7 @@ export function SlideRenderer({ slide, scale, animate, thumbnail, activeStep, on
     return set;
   }, [animate, activeStep, onClickSteps]);
 
-  return (
+  const content = (
     <div
       style={{
         width: CANVAS_WIDTH * scale,
@@ -62,7 +66,7 @@ export function SlideRenderer({ slide, scale, animate, thumbnail, activeStep, on
           height: CANVAS_HEIGHT,
           transform: `scale(${scale})`,
           transformOrigin: "top left",
-          backgroundColor: bg?.color ?? "#0f172a",
+          backgroundColor: bg?.color ?? themeBgColor ?? "#0f172a",
           backgroundImage: bg?.image ? `url(${bg.image})` : undefined,
           backgroundSize: "cover",
           backgroundPosition: "center",
@@ -84,4 +88,9 @@ export function SlideRenderer({ slide, scale, animate, thumbnail, activeStep, on
       </div>
     </div>
   );
+
+  if (theme) {
+    return <ThemeProvider theme={theme}>{content}</ThemeProvider>;
+  }
+  return content;
 }
