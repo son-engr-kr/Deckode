@@ -1,4 +1,6 @@
-import type { VideoElement as VideoElementType } from "@/types/deck";
+import type { VideoElement as VideoElementType, VideoStyle } from "@/types/deck";
+import { useTheme, resolveStyle } from "@/contexts/ThemeContext";
+import { useAssetUrl } from "@/contexts/AdapterContext";
 
 interface Props {
   element: VideoElementType;
@@ -24,7 +26,9 @@ function parseVideoUrl(src: string): { type: "youtube" | "vimeo" | "native"; emb
 }
 
 export function VideoElementRenderer({ element, thumbnail }: Props) {
-  const style = element.style ?? {};
+  const deckTheme = useTheme();
+  const style = resolveStyle<VideoStyle>(deckTheme.video, element.style);
+  const resolvedSrc = useAssetUrl(element.src);
 
   const commonStyle: React.CSSProperties = {
     width: element.size.w,
@@ -46,7 +50,7 @@ export function VideoElementRenderer({ element, thumbnail }: Props) {
     );
   }
 
-  const { type, embedUrl } = parseVideoUrl(element.src);
+  const { type, embedUrl } = parseVideoUrl(resolvedSrc ?? element.src);
 
   if (type === "youtube" || type === "vimeo") {
     const params = new URLSearchParams();

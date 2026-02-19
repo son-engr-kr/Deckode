@@ -1,4 +1,6 @@
-import type { TikZElement as TikZElementType } from "@/types/deck";
+import type { TikZElement as TikZElementType, TikZStyle } from "@/types/deck";
+import { useTheme, resolveStyle } from "@/contexts/ThemeContext";
+import { useAssetUrl } from "@/contexts/AdapterContext";
 
 interface Props {
   element: TikZElementType;
@@ -6,12 +8,14 @@ interface Props {
 }
 
 export function TikZElementRenderer({ element, thumbnail }: Props) {
-  const style = element.style ?? {};
+  const deckTheme = useTheme();
+  const style = resolveStyle<TikZStyle>(deckTheme.tikz, element.style);
+  const resolvedSvgUrl = useAssetUrl(element.svgUrl);
 
-  if (element.svgUrl) {
+  if (element.svgUrl && resolvedSvgUrl) {
     return (
       <img
-        src={element.svgUrl}
+        src={resolvedSvgUrl}
         alt="TikZ diagram"
         style={{
           width: element.size.w,

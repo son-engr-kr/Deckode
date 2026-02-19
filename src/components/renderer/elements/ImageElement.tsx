@@ -1,15 +1,21 @@
-import type { ImageElement as ImageElementType } from "@/types/deck";
+import type { ImageElement as ImageElementType, ImageStyle } from "@/types/deck";
+import { useTheme, resolveStyle } from "@/contexts/ThemeContext";
+import { useAssetUrl } from "@/contexts/AdapterContext";
 
 interface Props {
   element: ImageElementType;
 }
 
 export function ImageElementRenderer({ element }: Props) {
-  const style = element.style ?? {};
+  const theme = useTheme();
+  const style = resolveStyle<ImageStyle>(theme.image, element.style);
+  const resolvedSrc = useAssetUrl(element.src);
+
+  if (!resolvedSrc) return null;
 
   return (
     <img
-      src={element.src}
+      src={resolvedSrc}
       alt=""
       style={{
         width: element.size.w,

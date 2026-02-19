@@ -1,15 +1,36 @@
 import { useState, useEffect } from "react";
-import { listProjects, createProject, deleteProject, loadDeckFromDisk } from "@/utils/api";
 import { useDeckStore } from "@/stores/deckStore";
+import { FsAccessAdapter } from "@/adapters/fsAccess";
+import { ViteApiAdapter } from "@/adapters/viteApi";
+import {
+  listProjects,
+  createProject,
+  deleteProject,
+  loadDeckFromDisk,
+} from "@/utils/api";
+import type { FileSystemAdapter } from "@/adapters/types";
 import type { ProjectInfo } from "@/utils/api";
 
-export function ProjectSelector() {
+interface Props {
+  isDevMode: boolean;
+  onAdapterReady: (adapter: FileSystemAdapter) => void;
+}
+
+export function ProjectSelector({ isDevMode, onAdapterReady }: Props) {
+  if (isDevMode) {
+    return <ViteProjectSelector onAdapterReady={onAdapterReady} />;
+  }
+  return <FsAccessProjectSelector onAdapterReady={onAdapterReady} />;
+}
+
+// ── Dev mode: Vite API project list ──
+
+function ViteProjectSelector({ onAdapterReady }: { onAdapterReady: (adapter: FileSystemAdapter) => void }) {
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [creating, setCreating] = useState(false);
-  const openProject = useDeckStore((s) => s.openProject);
 
   const fetchProjects = () => {
     listProjects().then((p) => {
@@ -23,7 +44,9 @@ export function ProjectSelector() {
   const handleOpen = async (name: string) => {
     const deck = await loadDeckFromDisk(name);
     assert(deck !== null, `Failed to load deck for project "${name}"`);
-    openProject(name, deck);
+    const adapter = new ViteApiAdapter(name);
+    onAdapterReady(adapter);
+    useDeckStore.getState().openProject(name, deck);
     history.replaceState(null, "", `?project=${encodeURIComponent(name)}`);
   };
 
@@ -36,7 +59,6 @@ export function ProjectSelector() {
     setNewName("");
     setNewTitle("");
     setCreating(false);
-    // Open the newly created project
     await handleOpen(trimmed);
   };
 
@@ -58,7 +80,6 @@ export function ProjectSelector() {
       <div className="w-full max-w-lg px-6">
         <h1 className="text-2xl font-bold text-zinc-100 mb-6">Deckode Projects</h1>
 
-        {/* Project list */}
         {projects.length === 0 && (
           <p className="text-sm text-zinc-500 mb-6">No projects yet. Create one below.</p>
         )}
@@ -116,6 +137,55 @@ export function ProjectSelector() {
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Prod mode: File System Access ──
+
+function FsAccessProjectSelector({ onAdapterReady }: { onAdapterReady: (adapter: FileSystemAdapter) => void }) {
+  const [error, setError] = useState<string | null>(null);
+
+  const handleOpenFolder = async () => {
+    setError(null);
+    try {
+      const adapter = await FsAccessAdapter.openDirectory();
+      // Verify deck.json exists by loading it
+      const deck = await adapter.loadDeck();
+      onAdapterReady(adapter);
+      useDeckStore.getState().openProject(adapter.projectName, deck);
+    } catch (err) {
+      // User cancelled the directory picker
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      throw err;
+    }
+  };
+
+  return (
+    <div className="h-screen w-screen flex items-center justify-center bg-zinc-950 text-white">
+      <div className="w-full max-w-lg px-6 text-center">
+        <h1 className="text-2xl font-bold text-zinc-100 mb-2">Deckode</h1>
+        <p className="text-sm text-zinc-400 mb-8">
+          Open a project folder containing a <code className="text-zinc-300">deck.json</code> file.
+        </p>
+
+        <button
+          onClick={handleOpenFolder}
+          className="px-6 py-3 rounded-lg bg-blue-600 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+        >
+          Open Project Folder
+        </button>
+
+        {error && (
+          <div className="mt-4 bg-red-900/30 border border-red-700 rounded p-3 text-sm text-red-400">
+            {error}
+          </div>
+        )}
+
+        <p className="mt-8 text-xs text-zinc-600">
+          Static mode — file changes are saved directly to your local folder via the File System Access API.
+        </p>
       </div>
     </div>
   );

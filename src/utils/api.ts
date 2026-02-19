@@ -1,9 +1,7 @@
 import type { Deck } from "@/types/deck";
+import type { ProjectInfo } from "@/adapters/types";
 
-export interface ProjectInfo {
-  name: string;
-  title: string;
-}
+export type { ProjectInfo };
 
 export async function listProjects(): Promise<ProjectInfo[]> {
   const res = await fetch("/api/projects");

@@ -3,8 +3,14 @@ import { immer } from "zustand/middleware/immer";
 import { subscribeWithSelector } from "zustand/middleware";
 import { temporal } from "zundo";
 import type { Animation, Deck, DeckTheme, Slide, SlideElement } from "@/types/deck";
-import { saveDeckToDisk } from "@/utils/api";
+import type { FileSystemAdapter } from "@/adapters/types";
 import { nextElementId } from "@/utils/id";
+
+// Module-level adapter reference, set by App when adapter is created
+let _adapter: FileSystemAdapter | null = null;
+export function setStoreAdapter(adapter: FileSystemAdapter | null) {
+  _adapter = adapter;
+}
 
 interface DeckState {
   currentProject: string | null;
@@ -108,9 +114,9 @@ export const useDeckStore = create<DeckState>()(
 
         saveToDisk: async () => {
           const { deck, isSaving, currentProject } = get();
-          if (!deck || isSaving || !currentProject) return;
+          if (!deck || isSaving || !currentProject || !_adapter) return;
           set((state) => { state.isSaving = true; });
-          await saveDeckToDisk(deck, currentProject);
+          await _adapter.saveDeck(deck);
           set((state) => { state.isSaving = false; state.isDirty = false; });
         },
 

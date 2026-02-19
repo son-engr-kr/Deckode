@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useDeckStore } from "@/stores/deckStore";
 import type { Slide, SlideElement, TikZElement } from "@/types/deck";
-import { renderTikz } from "@/utils/api";
+import { useAdapter } from "@/contexts/AdapterContext";
 import { AnimationEditor } from "./AnimationEditor";
 import {
   ColorField,
@@ -340,7 +340,7 @@ function TikZEditor({
   slideId: string;
   updateElement: (slideId: string, elementId: string, patch: Partial<SlideElement>) => void;
 }) {
-  const project = useDeckStore((s) => s.currentProject);
+  const adapter = useAdapter();
   const [status, setStatus] = useState<RenderStatus>(element.svgUrl ? "rendered" : "idle");
   const [error, setError] = useState<string | null>(null);
   const [showPreamble, setShowPreamble] = useState(!!element.preamble);
@@ -348,12 +348,11 @@ function TikZEditor({
   const renderIdRef = useRef(0);
 
   const doRender = useCallback(async (content: string, preamble?: string) => {
-    assert(project !== null, "No project selected");
     const renderId = ++renderIdRef.current;
     setStatus("rendering");
     setError(null);
 
-    const result = await renderTikz(project, element.id, content, preamble);
+    const result = await adapter.renderTikz(element.id, content, preamble);
 
     // Stale render — a newer one was triggered
     if (renderId !== renderIdRef.current) return;
@@ -366,7 +365,7 @@ function TikZEditor({
       setStatus("error");
       setError(result.error);
     }
-  }, [project, element.id, slideId, updateElement]);
+  }, [adapter, element.id, slideId, updateElement]);
 
   // Auto-render: debounce 1.5s after content/preamble changes
   const scheduleRender = useCallback((content: string, preamble?: string) => {
@@ -436,14 +435,20 @@ function TikZEditor({
         )}
       </div>
 
-      {/* Render button */}
-      <button
-        onClick={handleManualRender}
-        disabled={status === "rendering"}
-        className="w-full px-3 py-1.5 text-xs font-medium rounded bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      >
-        {status === "rendering" ? "Rendering..." : "Render"}
-      </button>
+      {/* Render button / FS Access mode notice */}
+      {adapter.mode === "fs-access" ? (
+        <div className="bg-zinc-800 border border-zinc-700 rounded p-2 text-xs text-zinc-400">
+          TikZ rendering is not available in static mode. Use <code className="text-zinc-300">npm run dev</code> for TikZ support.
+        </div>
+      ) : (
+        <button
+          onClick={handleManualRender}
+          disabled={status === "rendering"}
+          className="w-full px-3 py-1.5 text-xs font-medium rounded bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {status === "rendering" ? "Rendering..." : "Render"}
+        </button>
+      )}
 
       {/* Error display */}
       {error && (
@@ -467,8 +472,4 @@ function StatusBadge({ status }: { status: RenderStatus }) {
   };
   const { label, color } = config[status];
   return <span className={`text-xs ${color}`}>{label}</span>;
-}
-
-function assert(condition: unknown, message: string): asserts condition {
-  if (!condition) throw new Error(message);
 }

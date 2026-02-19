@@ -4,13 +4,14 @@ import { SlideRenderer } from "@/components/renderer/SlideRenderer";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/types/deck";
 import type { ImageElement, VideoElement } from "@/types/deck";
 import { SelectionOverlay } from "./SelectionOverlay";
-import { uploadAsset } from "@/utils/api";
+import { useAdapter } from "@/contexts/AdapterContext";
 
 export function EditorCanvas() {
   const deck = useDeckStore((s) => s.deck);
   const currentSlideIndex = useDeckStore((s) => s.currentSlideIndex);
   const selectElement = useDeckStore((s) => s.selectElement);
   const addElement = useDeckStore((s) => s.addElement);
+  const adapter = useAdapter();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasWrapperRef = useRef<HTMLDivElement>(null);
@@ -57,9 +58,7 @@ export function EditorCanvas() {
     const isVideo = file.type.startsWith("video/");
     if (!isImage && !isVideo) return;
 
-    const currentProject = useDeckStore.getState().currentProject;
-    assert(currentProject !== null, "No project open");
-    const url = await uploadAsset(file, currentProject);
+    const url = await adapter.uploadAsset(file);
 
     const wrapper = canvasWrapperRef.current;
     assert(wrapper !== null, "canvasWrapperRef not attached");
@@ -106,7 +105,7 @@ export function EditorCanvas() {
       onDrop={handleDrop}
     >
       <div ref={canvasWrapperRef} className="relative">
-        <SlideRenderer slide={slide} scale={scale} />
+        <SlideRenderer slide={slide} scale={scale} theme={deck.theme} />
         <SelectionOverlay slide={slide} scale={scale} />
       </div>
     </div>
