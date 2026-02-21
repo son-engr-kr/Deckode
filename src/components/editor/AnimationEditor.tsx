@@ -8,7 +8,7 @@ const EFFECTS: AnimationEffect[] = [
   "typewriter",
 ];
 
-const TRIGGERS: AnimationTrigger[] = ["onEnter", "onClick"];
+const TRIGGERS: AnimationTrigger[] = ["onEnter", "onClick", "onKey", "afterPrevious", "withPrevious"];
 
 interface AnimationEditorProps {
   slideId: string;
@@ -95,6 +95,21 @@ export function AnimationEditor({ slideId, elementId, animations }: AnimationEdi
                 ))}
               </select>
             </label>
+
+            {/* Key (only for onKey trigger) */}
+            {animation.trigger === "onKey" && (
+              <label className="flex items-center gap-2">
+                <span className="text-zinc-500 text-xs w-14">Key</span>
+                <input
+                  type="text"
+                  className="flex-1 bg-zinc-800 text-zinc-200 rounded px-1.5 py-0.5 text-xs font-mono border border-zinc-700 focus:border-blue-500 focus:outline-none w-0"
+                  value={animation.key ?? ""}
+                  maxLength={1}
+                  placeholder="e.g. q"
+                  onChange={(e) => updateAnimation(slideId, globalIndex, { key: e.target.value || undefined })}
+                />
+              </label>
+            )}
 
             {/* Order (only meaningful for onClick) */}
             {animation.trigger === "onClick" && (

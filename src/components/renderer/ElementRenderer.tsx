@@ -13,10 +13,12 @@ interface Props {
   animations?: Animation[];
   /** Set of animations that should be in their "animate" state (controlled by parent step logic) */
   activeAnimations?: Set<Animation>;
+  /** Computed delay overrides for afterPrevious animations (ms) */
+  delayOverrides?: Map<Animation, number>;
   thumbnail?: boolean;
 }
 
-export function ElementRenderer({ element, animations, activeAnimations, thumbnail }: Props) {
+export function ElementRenderer({ element, animations, activeAnimations, delayOverrides, thumbnail }: Props) {
   const transform = element.rotation ? `rotate(${element.rotation}deg)` : undefined;
 
   const positionStyle: React.CSSProperties = {
@@ -40,7 +42,7 @@ export function ElementRenderer({ element, animations, activeAnimations, thumbna
 
   return (
     <div data-element-id={element.id} className="absolute" style={positionStyle}>
-      <AnimatedWrapper animations={animations} activeAnimations={activeAnimations}>
+      <AnimatedWrapper animations={animations} activeAnimations={activeAnimations} delayOverrides={delayOverrides}>
         {child}
       </AnimatedWrapper>
     </div>
@@ -50,10 +52,12 @@ export function ElementRenderer({ element, animations, activeAnimations, thumbna
 function AnimatedWrapper({
   animations,
   activeAnimations,
+  delayOverrides,
   children,
 }: {
   animations: Animation[];
   activeAnimations?: Set<Animation>;
+  delayOverrides?: Map<Animation, number>;
   children: React.ReactNode;
 }) {
   let initial: Record<string, string | number> = {};
@@ -64,16 +68,18 @@ function AnimatedWrapper({
     const config = getAnimationConfig(anim.effect);
     initial = { ...initial, ...config.initial };
 
-    // onEnter: always activate. onClick: only if in activeAnimations set.
+    // onEnter: always activate.
+    // onClick/onKey/withPrevious/afterPrevious: only if in activeAnimations set.
     const isActive =
       anim.trigger === "onEnter" ||
       (activeAnimations !== undefined && activeAnimations.has(anim));
 
     if (isActive) {
       animate = { ...animate, ...config.animate };
+      const delayMs = delayOverrides?.get(anim) ?? (anim.delay ?? 0);
       transition = {
         duration: (anim.duration ?? 500) / 1000,
-        delay: (anim.delay ?? 0) / 1000,
+        delay: delayMs / 1000,
         ...transition,
       };
     }

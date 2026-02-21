@@ -196,7 +196,7 @@
       "required": ["target", "trigger", "effect"],
       "properties": {
         "target": { "type": "string" },
-        "trigger": { "type": "string", "enum": ["onEnter", "onClick"] },
+        "trigger": { "type": "string", "enum": ["onEnter", "onClick", "onKey", "afterPrevious", "withPrevious"] },
         "effect": {
           "type": "string",
           "enum": [
@@ -206,7 +206,9 @@
           ]
         },
         "delay": { "type": "number", "minimum": 0 },
-        "duration": { "type": "number", "minimum": 0 }
+        "duration": { "type": "number", "minimum": 0 },
+        "order": { "type": "integer", "minimum": 0 },
+        "key": { "type": "string", "minLength": 1 }
       }
     }
   }

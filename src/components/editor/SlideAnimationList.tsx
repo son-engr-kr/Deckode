@@ -8,7 +8,7 @@ const EFFECTS: AnimationEffect[] = [
   "typewriter",
 ];
 
-const TRIGGERS: AnimationTrigger[] = ["onEnter", "onClick"];
+const TRIGGERS: AnimationTrigger[] = ["onEnter", "onClick", "onKey", "afterPrevious", "withPrevious"];
 
 interface Props {
   onSelectElement: (elementId: string) => void;
@@ -144,7 +144,7 @@ export function SlideAnimationList({ onSelectElement }: Props) {
               </select>
             </div>
 
-            {/* Timing + order row */}
+            {/* Timing + order + key row */}
             <div className="flex items-center gap-2 text-xs">
               {anim.trigger === "onClick" && (
                 <label className="flex items-center gap-1">
@@ -162,6 +162,19 @@ export function SlideAnimationList({ onSelectElement }: Props) {
                         order: val === "" ? undefined : parseInt(val, 10),
                       });
                     }}
+                  />
+                </label>
+              )}
+              {anim.trigger === "onKey" && (
+                <label className="flex items-center gap-1">
+                  <span className="text-zinc-500">key</span>
+                  <input
+                    type="text"
+                    className="w-10 bg-zinc-800 text-zinc-200 rounded px-1 py-0.5 text-xs font-mono border border-zinc-700 focus:border-blue-500 focus:outline-none"
+                    value={anim.key ?? ""}
+                    maxLength={1}
+                    placeholder="-"
+                    onChange={(e) => updateAnimation(slide.id, index, { key: e.target.value || undefined })}
                   />
                 </label>
               )}

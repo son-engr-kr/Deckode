@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { Slide, Animation, DeckTheme } from "@/types/deck";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/types/deck";
+import type { AnimationStep } from "@/utils/animationSteps";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ElementRenderer } from "./ElementRenderer";
 
@@ -9,17 +10,17 @@ interface Props {
   scale: number;
   animate?: boolean;
   thumbnail?: boolean;
-  /** Current onClick step (0 = no onClick steps triggered yet) */
+  /** Current step index (0 = no interactive steps triggered yet) */
   activeStep?: number;
-  /** Grouped onClick steps from computeOnClickSteps */
-  onClickSteps?: Animation[][];
+  /** Grouped animation steps from computeSteps */
+  steps?: AnimationStep[];
   /** Called when clicking the slide area — parent uses this to advance step */
   onAdvance?: () => void;
   /** Deck-level theme for default styles */
   theme?: DeckTheme;
 }
 
-export function SlideRenderer({ slide, scale, animate, thumbnail, activeStep, onClickSteps, onAdvance, theme }: Props) {
+export function SlideRenderer({ slide, scale, animate, thumbnail, activeStep, steps, onAdvance, theme }: Props) {
   const bg = slide.background;
   const themeBgColor = theme?.slide?.background?.color;
 
@@ -38,17 +39,25 @@ export function SlideRenderer({ slide, scale, animate, thumbnail, activeStep, on
     return map;
   }, [animate, slide.animations]);
 
-  // Build the set of active animations: all onEnter + onClick steps whose index < activeStep
-  const activeAnimations = useMemo(() => {
-    if (!animate || activeStep === undefined || !onClickSteps) return undefined;
+  // Build the set of active animations + delay overrides from steps
+  const { activeAnimations, delayOverrides } = useMemo(() => {
+    if (!animate || activeStep === undefined || !steps) {
+      return { activeAnimations: undefined, delayOverrides: undefined };
+    }
     const set = new Set<Animation>();
-    for (let i = 0; i < activeStep && i < onClickSteps.length; i++) {
-      for (const anim of onClickSteps[i]!) {
+    const delays = new Map<Animation, number>();
+    for (let i = 0; i < activeStep && i < steps.length; i++) {
+      const step = steps[i]!;
+      for (const anim of step.animations) {
         set.add(anim);
+        const override = step.delayOverrides.get(anim);
+        if (override !== undefined) {
+          delays.set(anim, override);
+        }
       }
     }
-    return set;
-  }, [animate, activeStep, onClickSteps]);
+    return { activeAnimations: set, delayOverrides: delays };
+  }, [animate, activeStep, steps]);
 
   const content = (
     <div
@@ -82,6 +91,7 @@ export function SlideRenderer({ slide, scale, animate, thumbnail, activeStep, on
             element={element}
             animations={animationMap?.get(element.id)}
             activeAnimations={activeAnimations}
+            delayOverrides={delayOverrides}
             thumbnail={thumbnail}
           />
         ))}

@@ -128,7 +128,7 @@ export type SlideElement = TextElement | ImageElement | CodeElement | ShapeEleme
 
 // ----- Animations -----
 
-export type AnimationTrigger = "onEnter" | "onClick";
+export type AnimationTrigger = "onEnter" | "onClick" | "onKey" | "afterPrevious" | "withPrevious";
 
 export type AnimationEffect =
   | "fadeIn"
@@ -148,6 +148,7 @@ export interface Animation {
   delay?: number;
   duration?: number;
   order?: number;
+  key?: string;
 }
 
 // ----- Slide -----

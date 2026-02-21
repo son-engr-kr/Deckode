@@ -4,7 +4,7 @@ import { useDeckStore } from "@/stores/deckStore";
 import { SlideRenderer } from "./SlideRenderer";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/types/deck";
 import type { SlideTransition } from "@/types/deck";
-import { computeOnClickSteps } from "@/utils/animationSteps";
+import { computeSteps } from "@/utils/animationSteps";
 
 const transitionVariants = {
   fade: {
@@ -36,7 +36,7 @@ export function SlideViewer() {
 
   const slide = deck?.slides[currentSlideIndex];
   const steps = useMemo(
-    () => computeOnClickSteps(slide?.animations ?? []),
+    () => computeSteps(slide?.animations ?? []),
     [slide?.animations],
   );
 
@@ -76,11 +76,18 @@ export function SlideViewer() {
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
         prevSlide();
+      } else {
+        // Check if current step is an onKey step matching this key
+        const currentStep = steps[activeStep];
+        if (currentStep?.trigger === "onKey" && currentStep.key === e.key) {
+          e.preventDefault();
+          advance();
+        }
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [advance, prevSlide]);
+  }, [advance, prevSlide, steps, activeStep]);
 
   if (!deck) {
     return (
@@ -112,7 +119,7 @@ export function SlideViewer() {
               scale={scale}
               animate
               activeStep={activeStep}
-              onClickSteps={steps}
+              steps={steps}
               onAdvance={advance}
               theme={deck.theme}
             />

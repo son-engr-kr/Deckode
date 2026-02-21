@@ -232,7 +232,8 @@ import { SlideRenderer } from "@/components/renderer/SlideRenderer";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/types/deck";
 import { AnimatePresence, motion } from "framer-motion";
 import type { SlideTransition } from "@/types/deck";
-import { computeOnClickSteps } from "@/utils/animationSteps";
+import { computeSteps } from "@/utils/animationSteps";
+import type { AnimationStep } from "@/utils/animationSteps";
 
 const transitionVariants = {
   fade: { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } },
@@ -249,7 +250,7 @@ function PresentationMode({ onExit }: { onExit: () => void }) {
 
   const slide = deck?.slides[currentSlideIndex];
   const steps = useMemo(
-    () => computeOnClickSteps(slide?.animations ?? []),
+    () => computeSteps(slide?.animations ?? []),
     [slide?.animations],
   );
 
@@ -266,9 +267,13 @@ function PresentationMode({ onExit }: { onExit: () => void }) {
     }
   }, [activeStep, steps.length, nextSlide]);
 
-  // Use ref so the keydown handler always calls the latest advance without re-registering
+  // Use refs so the keydown handler always reads the latest values without re-registering
   const advanceRef = useRef(advance);
   advanceRef.current = advance;
+  const stepsRef = useRef(steps);
+  stepsRef.current = steps;
+  const activeStepRef = useRef(activeStep);
+  activeStepRef.current = activeStep;
 
   // Fullscreen: enter on mount, exit on unmount — runs once only
   useEffect(() => {
@@ -291,6 +296,13 @@ function PresentationMode({ onExit }: { onExit: () => void }) {
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
         prevSlide();
+      } else {
+        // Check if current step is an onKey step matching this key
+        const currentStep = stepsRef.current[activeStepRef.current];
+        if (currentStep?.trigger === "onKey" && currentStep.key === e.key) {
+          e.preventDefault();
+          advanceRef.current();
+        }
       }
     };
     window.addEventListener("keydown", handleKey);
@@ -313,7 +325,7 @@ function SlideViewerPresentation({
   onAdvance,
 }: {
   activeStep: number;
-  steps: import("@/types/deck").Animation[][];
+  steps: AnimationStep[];
   onAdvance: () => void;
 }) {
   const deck = useDeckStore((s) => s.deck);
@@ -352,7 +364,7 @@ function SlideViewerPresentation({
               scale={scale}
               animate
               activeStep={activeStep}
-              onClickSteps={steps}
+              steps={steps}
               onAdvance={onAdvance}
               theme={deck?.theme}
             />
