@@ -81,7 +81,7 @@ Run `npm run dev`, see a rendered slide from `deck.json`.
 - [X] Code syntax highlighting via Shiki
 - [X] Slide navigation (arrow keys, click)
 - [X] Slide transition animations (fade, slide) via Framer Motion
-- [ ] Basic theme system (CSS variables from `deckode.config.json`)
+- [X] Basic theme system (ThemeContext, ThemePanel, per-element-type defaults)
 - [X] Aspect ratio enforcement (16:9 / 4:3)
 - [X] File persistence: Vite plugin API (`/api/save-deck`, `/api/load-deck`), auto-save on change, Ctrl+S
 - [X] Fullscreen presentation mode (F5 to enter, Escape to exit, arrow keys nav)
@@ -201,12 +201,12 @@ Run `npm run dev`, see a rendered slide from `deck.json`.
 
 ### Goals
 
-- [ ] Abstract file I/O behind an adapter interface (`FileSystemAdapter`)
-- [ ] Implement `FsAccessAdapter` using the File System Access API (`showDirectoryPicker`, `FileSystemFileHandle`, `FileSystemDirectoryHandle`)
-- [ ] Replace Vite plugin API endpoints (`/api/save-deck`, `/api/load-deck`, `/api/upload-asset`) with adapter calls
-- [ ] Project open flow: user picks a local folder via OS directory picker → app reads `deck.json` and assets directly
-- [ ] Persist directory handle across page reloads (IndexedDB) to avoid re-prompting
-- [ ] WASM TeX engine for TikZ rendering (eliminate server-side LaTeX dependency, enable fully client-side operation)
+- [X] Abstract file I/O behind an adapter interface (`FileSystemAdapter`)
+- [X] Implement `FsAccessAdapter` using the File System Access API (`showDirectoryPicker`, `FileSystemFileHandle`, `FileSystemDirectoryHandle`)
+- [X] Replace Vite plugin API endpoints (`/api/save-deck`, `/api/load-deck`, `/api/upload-asset`) with adapter calls
+- [X] Project open flow: user picks a local folder via OS directory picker → app reads `deck.json` and assets directly
+- [X] Persist directory handle across page reloads (IndexedDB) to avoid re-prompting
+- [X] WASM TeX engine for TikZ rendering (eliminate server-side LaTeX dependency, enable fully client-side operation)
 - [ ] Static deployment to GitHub Pages — zero backend, fully browser-native
 
 ### Key Decisions
