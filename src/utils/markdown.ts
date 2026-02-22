@@ -55,6 +55,21 @@ export function renderMarkdown(source: string): ReactNode {
       continue;
     }
 
+    // Single-line block math: $$...$$
+    const singleLineMath = trimmed.match(/^\$\$(.+)\$\$$/);
+    if (singleLineMath) {
+      flushList();
+      const html = katex.renderToString(singleLineMath[1]!, { displayMode: true, throwOnError: false });
+      blocks.push(
+        createElement("div", {
+          key: blockKey++,
+          className: "my-2 text-center",
+          dangerouslySetInnerHTML: { __html: html },
+        }),
+      );
+      continue;
+    }
+
     // List item
     if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
       listItems.push(trimmed.slice(2));
