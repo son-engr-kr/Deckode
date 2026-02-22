@@ -187,7 +187,7 @@ Run `npm run dev`, see a rendered slide from `deck.json`.
   - [X] Animation-aware script highlighting: notes highlight the relevant section as animations progress (marker-based, e.g. `[step:1]...[/step]` tags in notes so users can easily edit the mapping)
   - [X] Laser pointer overlay on presentation slide (toggle with L key, synced via BroadcastChannel)
 - [X] PDF export via browser print API (window.print() with @media print CSS, no server dependency)
-- [ ] PPTX export (client-side via pptxgenjs, no server dependency)
+- [X] PPTX export (client-side via pptxgenjs, no server dependency)
 - [ ] CLI: `npx deckode dev` (local development only)
 
 ---
@@ -197,7 +197,7 @@ Run `npm run dev`, see a rendered slide from `deck.json`.
 ### Goals
 
 - [X] TikZ/PGFPlots rendering: WASM TeX engine (TikZJax) with TikZ editor UI (live preview, preamble, error display)
-- [ ] WASM TeX caching optimization (IndexedDB SVG cache, compilation result memoization for repeated renders)
+- [X] WASM TeX caching optimization (IndexedDB SVG cache, compilation result memoization for repeated renders)
 - [ ] Text-to-TikZ PoC: AI generates/modifies TikZ code from user feedback, rendered as slide element (client-side AI API call + WASM rendering)
 
 ### Key Decisions
@@ -237,7 +237,7 @@ Run `npm run dev`, see a rendered slide from `deck.json`.
 - [X] JSON Schema serves as the contract between AI and Deckode
 - [X] Validate AI output against schema before applying
 - [ ] MCP server: expose Deckode tools via Model Context Protocol so AI agents (Claude Desktop, etc.) can manipulate `deck.json` directly
-- [ ] Comprehensive `ai-slide-guide.md`: full specification with examples for every element type, animation, and layout
+- [X] Comprehensive `ai-slide-guide.md`: full specification with examples for every element type, animation, and layout
 
 ### Track B: In-App AI Chat — ON HOLD
 
