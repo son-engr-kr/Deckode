@@ -173,11 +173,11 @@ Run `npm run dev`, see a rendered slide from `deck.json`.
 - [X] Extended animation triggers: `onKey` (specific keypress advances/triggers animation), `afterPrevious` (auto-chain after the previous animation completes), `withPrevious` (play simultaneously with previous animation)
 - [X] Animation preview in editor: play button in Property Panel to preview selected element's animation without entering presentation mode
 - [X] Presenter mode with BroadcastChannel (main window + presenter notes window)
-- [ ] Custom component loading from `components/` directory
+- [X] Custom component loading from `components/` directory
 - [ ] Layout templates (`layouts/` directory, reusable slide structures)
-- [ ] PDF export via Playwright (headless browser screenshot per slide)
-- [ ] PPTX export (basic, flattened)
-- [ ] CLI: `npx deckode dev` / `npx deckode export pdf`
+- [ ] PDF export via browser print API (window.print() with @media print CSS, no server dependency)
+- [ ] PPTX export (client-side via pptxgenjs, no server dependency)
+- [ ] CLI: `npx deckode dev` (local development only)
 
 ---
 
@@ -185,14 +185,14 @@ Run `npm run dev`, see a rendered slide from `deck.json`.
 
 ### Goals
 
-- [X] TikZ/PGFPlots rendering: server-side TeX → DVI → SVG pipeline with TikZ editor UI (live preview, preamble, error display)
-- [ ] Server-side LaTeX compilation latency optimization (persistent caching, incremental builds)
-- [ ] Text-to-TikZ PoC: AI generates/modifies TikZ code from user feedback, rendered as slide element
+- [X] TikZ/PGFPlots rendering: WASM TeX engine (TikZJax) with TikZ editor UI (live preview, preamble, error display)
+- [ ] WASM TeX caching optimization (IndexedDB SVG cache, compilation result memoization for repeated renders)
+- [ ] Text-to-TikZ PoC: AI generates/modifies TikZ code from user feedback, rendered as slide element (client-side AI API call + WASM rendering)
 
 ### Key Decisions
 
 - Simple math: KaTeX (client-side, already implemented in Phase 1).
-- Complex diagrams (TikZ/PGFPlots): server-side rendering pipeline. Requires a separate rendering service or WASM-based TeX engine.
+- Complex diagrams (TikZ/PGFPlots): WASM-based TeX engine (TikZJax) running entirely in the browser. No server dependency.
 - TikZ output is embedded as SVG in a new `tikz` element type in `deck.json`.
 
 ---
@@ -214,25 +214,34 @@ Run `npm run dev`, see a rendered slide from `deck.json`.
 - File System Access API is Chrome/Edge only. Firefox/Safari users will need a polyfill or fallback (future consideration).
 - Vite remains as dev server for HMR during development, but no longer handles file I/O.
 - With WASM TeX + File System Access API, the app becomes fully self-contained in the browser.
+- **Zero-server architecture**: The production build is a static SPA deployable to GitHub Pages. All features (rendering, file I/O, TikZ compilation, exports) run entirely client-side.
 
 ---
 
 ## Phase 6: AI Agent Integration
 
-### Goals
+### Track A: External AI Tools (primary)
 
 - [X] Define a "tool" interface for AI: `createDeck`, `addSlide`, `updateElement`, `deleteElement`
-- [ ] AI generates `deck.json` from natural language prompt
-- [ ] AI modifies existing deck based on conversational instructions
 - [X] JSON Schema serves as the contract between AI and Deckode
 - [X] Validate AI output against schema before applying
-- [ ] AI guardrails: validate and auto-correct AI-generated code (LaTeX, Tailwind classes, animation params) before rendering
-- [ ] AI natural language → animation mapping (e.g. "slide this logo to the top-right" → Framer Motion animation config in `deck.json`)
+- [ ] MCP server: expose Deckode tools via Model Context Protocol so AI agents (Claude Desktop, etc.) can manipulate `deck.json` directly
+- [ ] Comprehensive `ai-slide-guide.md`: full specification with examples for every element type, animation, and layout
+
+### Track B: In-App AI Chat — ON HOLD
+
+> **Deferred**: Requires API keys and further design discussion. Do not implement unless explicitly requested.
+
+- [ ] API key management UI (BYOK, stored in IndexedDB)
+- [ ] In-app chat panel (natural language → deck.json generation)
+- [ ] AI guardrails (validate AI-generated code before rendering)
+- [ ] AI natural language → animation mapping
 
 ### Key Decisions
 
 - AI integration is through `deck.json` manipulation. The AI does not need to know about React components or internal rendering. It only needs to produce valid `deck.json`.
 - See `docs/ai-slide-guide.md` for the full AI-facing specification.
+- **External tools are first-class citizens**: Claude Code, Cursor, or any tool that reads the guide and schema can generate valid decks without any integration work.
 
 ---
 
