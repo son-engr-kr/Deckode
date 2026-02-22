@@ -30,8 +30,8 @@ export function App() {
     }
   }, []);
 
-  const isPresenterMode =
-    new URLSearchParams(window.location.search).get("mode") === "presenter";
+  const urlMode = new URLSearchParams(window.location.search).get("mode");
+  const isAudiencePopup = urlMode === "audience" || urlMode === "presenter";
 
   // Sync URL when project changes (dev mode only)
   useEffect(() => {
@@ -87,7 +87,7 @@ export function App() {
 
   return (
     <AdapterProvider adapter={adapter}>
-      {isPresenterMode ? <PresenterView /> : <EditorLayout />}
+      {isAudiencePopup ? <PresenterView /> : <EditorLayout />}
     </AdapterProvider>
   );
 }
