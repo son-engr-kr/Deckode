@@ -10,6 +10,7 @@ import { SlideAnimationList } from "./SlideAnimationList";
 import { ThemePanel } from "./ThemePanel";
 import { PresentationMode } from "@/components/presenter/PresentationMode";
 import { PrintExport } from "@/components/export/PrintExport";
+import { exportToPptx } from "@/components/export/pptxExport";
 
 function performUndoRedo(direction: "undo" | "redo") {
   const temporal = useDeckStore.temporal.getState();
@@ -232,6 +233,15 @@ export function EditorLayout() {
           className="text-xs px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
         >
           PDF
+        </button>
+        <button
+          onClick={() => {
+            const deck = useDeckStore.getState().deck;
+            if (deck) exportToPptx(deck);
+          }}
+          className="text-xs px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+        >
+          PPTX
         </button>
         <button
           onClick={() => setRightPanel(rightPanel === "theme" ? "properties" : "theme")}
