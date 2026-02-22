@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useDeckStore } from "@/stores/deckStore";
 import { findUndoChanges } from "@/utils/deckDiff";
 import { SlideList } from "./SlideList";
@@ -40,6 +40,59 @@ export function EditorLayout() {
   const isDirty = useDeckStore((s) => s.isDirty);
   const isSaving = useDeckStore((s) => s.isSaving);
   const saveToDisk = useDeckStore((s) => s.saveToDisk);
+
+  // Resizable panel widths
+  const [leftWidth, setLeftWidth] = useState(170);
+  const [rightWidth, setRightWidth] = useState(240);
+  const dragRef = useRef<{
+    side: "left" | "right";
+    startX: number;
+    startWidth: number;
+  } | null>(null);
+  const leftWidthRef = useRef(leftWidth);
+  leftWidthRef.current = leftWidth;
+  const rightWidthRef = useRef(rightWidth);
+  rightWidthRef.current = rightWidth;
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragRef.current) return;
+      const { side, startX, startWidth } = dragRef.current;
+      const delta = e.clientX - startX;
+      if (side === "left") {
+        setLeftWidth(Math.max(120, Math.min(400, startWidth + delta)));
+      } else {
+        setRightWidth(Math.max(180, Math.min(500, startWidth - delta)));
+      }
+    };
+    const onMouseUp = () => {
+      if (!dragRef.current) return;
+      dragRef.current = null;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, []);
+
+  const startDrag = useCallback(
+    (side: "left" | "right", e: React.MouseEvent) => {
+      e.preventDefault();
+      dragRef.current = {
+        side,
+        startX: e.clientX,
+        startWidth:
+          side === "left" ? leftWidthRef.current : rightWidthRef.current,
+      };
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    },
+    [],
+  );
 
   const handleSave = useCallback(() => {
     saveToDisk();
@@ -191,9 +244,18 @@ export function EditorLayout() {
       {/* Main area */}
       <div className="flex-1 flex overflow-hidden">
         {/* Slide list sidebar */}
-        <div className="w-[170px] border-r border-zinc-800 overflow-y-auto shrink-0">
+        <div
+          style={{ width: leftWidth }}
+          className="overflow-y-auto shrink-0 border-r border-zinc-800"
+        >
           <SlideList />
         </div>
+
+        {/* Left resize handle */}
+        <div
+          className="w-1 shrink-0 cursor-col-resize hover:bg-blue-500/40 active:bg-blue-500/40 transition-colors"
+          onMouseDown={(e) => startDrag("left", e)}
+        />
 
         {/* Center: canvas + optional bottom panel */}
         <div className="flex-1 flex flex-col overflow-hidden">
@@ -206,8 +268,17 @@ export function EditorLayout() {
           )}
         </div>
 
+        {/* Right resize handle */}
+        <div
+          className="w-1 shrink-0 cursor-col-resize hover:bg-blue-500/40 active:bg-blue-500/40 transition-colors"
+          onMouseDown={(e) => startDrag("right", e)}
+        />
+
         {/* Right sidebar */}
-        <div className="w-[240px] border-l border-zinc-800 flex flex-col shrink-0">
+        <div
+          style={{ width: rightWidth }}
+          className="flex flex-col shrink-0 border-l border-zinc-800"
+        >
           {rightPanel === "theme" ? (
             <div className="flex-1 overflow-y-auto">
               <ThemePanel />
