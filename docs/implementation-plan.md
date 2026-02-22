@@ -171,7 +171,7 @@ Run `npm run dev`, see a rendered slide from `deck.json`.
 - [X] Animation editor UI in Property Panel: add/remove/edit animations per element (effect, trigger, delay, duration) without touching JSON
 - [X] Slide-wide animation list panel with reorder, target element selector
 - [X] Extended animation triggers: `onKey` (specific keypress advances/triggers animation), `afterPrevious` (auto-chain after the previous animation completes), `withPrevious` (play simultaneously with previous animation)
-- [ ] Animation preview in editor: play button in Property Panel to preview selected element's animation without entering presentation mode
+- [X] Animation preview in editor: play button in Property Panel to preview selected element's animation without entering presentation mode
 - [X] Presenter mode with BroadcastChannel (main window + presenter notes window)
 - [ ] Custom component loading from `components/` directory
 - [ ] Layout templates (`layouts/` directory, reusable slide structures)
