@@ -2,15 +2,24 @@ import { useState, useEffect } from "react";
 import { useDeckStore } from "@/stores/deckStore";
 import { FsAccessAdapter } from "@/adapters/fsAccess";
 import { ViteApiAdapter } from "@/adapters/viteApi";
-import { restoreHandle } from "@/utils/handleStore";
+import {
+  restoreHandle,
+  saveHandle,
+  addRecentProject,
+  listRecentProjects,
+  removeRecentProject,
+} from "@/utils/handleStore";
+import type { RecentProject } from "@/utils/handleStore";
 import {
   listProjects,
   createProject,
   deleteProject,
   loadDeckFromDisk,
 } from "@/utils/api";
+import { NewProjectWizard } from "./NewProjectWizard";
 import type { FileSystemAdapter } from "@/adapters/types";
 import type { ProjectInfo } from "@/utils/api";
+import type { NewProjectConfig } from "@/utils/projectTemplates";
 
 interface Props {
   isDevMode: boolean;
@@ -29,8 +38,8 @@ export function ProjectSelector({ isDevMode, onAdapterReady }: Props) {
 function ViteProjectSelector({ onAdapterReady }: { onAdapterReady: (adapter: FileSystemAdapter) => void }) {
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newName, setNewName] = useState("");
-  const [newTitle, setNewTitle] = useState("");
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [projectName, setProjectName] = useState("");
   const [creating, setCreating] = useState(false);
 
   const fetchProjects = () => {
@@ -51,14 +60,14 @@ function ViteProjectSelector({ onAdapterReady }: { onAdapterReady: (adapter: Fil
     history.replaceState(null, "", `?project=${encodeURIComponent(name)}`);
   };
 
-  const handleCreate = async () => {
-    const trimmed = newName.trim();
+  const handleWizardConfirm = async (config: NewProjectConfig) => {
+    const trimmed = projectName.trim();
     assert(trimmed.length > 0, "Project name is required");
     assert(/^[a-zA-Z0-9_-]+$/.test(trimmed), "Project name may only contain letters, digits, hyphens, and underscores");
     setCreating(true);
-    await createProject(trimmed, newTitle.trim() || undefined);
-    setNewName("");
-    setNewTitle("");
+    setWizardOpen(false);
+    await createProject(trimmed, config);
+    setProjectName("");
     setCreating(false);
     await handleOpen(trimmed);
   };
@@ -109,36 +118,35 @@ function ViteProjectSelector({ onAdapterReady }: { onAdapterReady: (adapter: Fil
           ))}
         </div>
 
-        {/* New project form */}
+        {/* New project */}
         <div className="border border-zinc-800 rounded-lg p-4 bg-zinc-900">
           <h2 className="text-sm font-semibold text-zinc-300 mb-3">New Project</h2>
-          <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
             <input
               type="text"
               placeholder="project-name (letters, digits, hyphens)"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && newName.trim()) handleCreate(); }}
-              className="bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
-            />
-            <input
-              type="text"
-              placeholder="Title (optional)"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && newName.trim()) handleCreate(); }}
-              className="bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && projectName.trim()) setWizardOpen(true); }}
+              className="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
             />
             <button
-              onClick={handleCreate}
-              disabled={!newName.trim() || creating}
-              className="mt-1 px-4 py-2 rounded bg-blue-600 text-sm text-white hover:bg-blue-500 disabled:opacity-40 transition-colors"
+              onClick={() => setWizardOpen(true)}
+              disabled={!projectName.trim() || creating}
+              className="px-4 py-2 rounded bg-blue-600 text-sm text-white hover:bg-blue-500 disabled:opacity-40 transition-colors"
             >
               {creating ? "Creating..." : "Create"}
             </button>
           </div>
         </div>
       </div>
+
+      <NewProjectWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        onConfirm={handleWizardConfirm}
+        showNameField={false}
+      />
     </div>
   );
 }
@@ -148,34 +156,100 @@ function ViteProjectSelector({ onAdapterReady }: { onAdapterReady: (adapter: Fil
 function FsAccessProjectSelector({ onAdapterReady }: { onAdapterReady: (adapter: FileSystemAdapter) => void }) {
   const [error, setError] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(true);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
 
-  // Try to auto-restore a previously opened directory handle from IndexedDB
+  const loadRecentProjects = () => {
+    listRecentProjects().then(setRecentProjects);
+  };
+
+  // Try to auto-restore the most recently opened directory handle from IndexedDB
   useEffect(() => {
     restoreHandle()
       .then(async (handle) => {
-        if (!handle) { setRestoring(false); return; }
+        if (!handle) { setRestoring(false); loadRecentProjects(); return; }
         const adapter = FsAccessAdapter.fromHandle(handle);
         const deck = await adapter.loadDeck();
+        await addRecentProject(handle);
         onAdapterReady(adapter);
         useDeckStore.getState().openProject(adapter.projectName, deck);
       })
       .catch(() => {
         // Permission denied or handle stale — fall through to manual picker
         setRestoring(false);
+        loadRecentProjects();
       });
   }, [onAdapterReady]);
+
+  const openWithHandle = async (handle: FileSystemDirectoryHandle) => {
+    await saveHandle(handle);
+    await addRecentProject(handle);
+    const adapter = new FsAccessAdapter(handle);
+    const deck = await adapter.loadDeck();
+    onAdapterReady(adapter);
+    useDeckStore.getState().openProject(adapter.projectName, deck);
+  };
 
   const handleOpenFolder = async () => {
     setError(null);
     try {
       const adapter = await FsAccessAdapter.openDirectory();
-      // Verify deck.json exists by loading it
+      // openDirectory() already calls saveHandle; also add to recents
+      await addRecentProject(adapter.dirHandle);
       const deck = await adapter.loadDeck();
       onAdapterReady(adapter);
       useDeckStore.getState().openProject(adapter.projectName, deck);
     } catch (err) {
-      // User cancelled the directory picker
       if (err instanceof DOMException && err.name === "AbortError") return;
+      throw err;
+    }
+  };
+
+  const handleOpenRecent = async (entry: RecentProject) => {
+    setError(null);
+    try {
+      // Re-verify permission
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const perm = await (entry.handle as any).requestPermission({ mode: "readwrite" });
+      if (perm !== "granted") {
+        setError(`Permission denied for "${entry.name}". Try opening the folder manually.`);
+        return;
+      }
+      await openWithHandle(entry.handle);
+    } catch (err) {
+      // Handle stale or removed — remove from recents
+      await removeRecentProject(entry.name);
+      loadRecentProjects();
+      setError(`Could not reopen "${entry.name}". The folder may have been moved or deleted.`);
+    }
+  };
+
+  const handleRemoveRecent = async (name: string) => {
+    await removeRecentProject(name);
+    loadRecentProjects();
+  };
+
+  const handleNewProject = async (config: NewProjectConfig) => {
+    setWizardOpen(false);
+    setError(null);
+    setCreating(true);
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const showDirectoryPicker = (window as any).showDirectoryPicker as (
+        options?: { mode?: "read" | "readwrite" },
+      ) => Promise<FileSystemDirectoryHandle>;
+      const dirHandle = await showDirectoryPicker({ mode: "readwrite" });
+
+      await FsAccessAdapter.writeNewProject(dirHandle, config);
+      await openWithHandle(dirHandle);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setCreating(false);
+        return;
+      }
+      setCreating(false);
       throw err;
     }
   };
@@ -190,18 +264,58 @@ function FsAccessProjectSelector({ onAdapterReady }: { onAdapterReady: (adapter:
 
   return (
     <div className="h-screen w-screen flex items-center justify-center bg-zinc-950 text-white">
-      <div className="w-full max-w-lg px-6 text-center">
-        <h1 className="text-2xl font-bold text-zinc-100 mb-2">Deckode</h1>
-        <p className="text-sm text-zinc-400 mb-8">
-          Open a project folder containing a <code className="text-zinc-300">deck.json</code> file.
+      <div className="w-full max-w-lg px-6">
+        <h1 className="text-2xl font-bold text-zinc-100 mb-2 text-center">Deckode</h1>
+        <p className="text-sm text-zinc-400 mb-6 text-center">
+          Open an existing project or create a new one.
         </p>
 
-        <button
-          onClick={handleOpenFolder}
-          className="px-6 py-3 rounded-lg bg-blue-600 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
-        >
-          Open Project Folder
-        </button>
+        <div className="flex justify-center gap-3 mb-8">
+          <button
+            onClick={handleOpenFolder}
+            className="px-6 py-3 rounded-lg bg-zinc-800 border border-zinc-700 text-sm font-medium text-zinc-200 hover:border-zinc-500 hover:bg-zinc-700 transition-colors"
+          >
+            Open Project Folder
+          </button>
+          <button
+            onClick={() => setWizardOpen(true)}
+            disabled={creating}
+            className="px-6 py-3 rounded-lg bg-blue-600 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors"
+          >
+            {creating ? "Creating..." : "New Project"}
+          </button>
+        </div>
+
+        {recentProjects.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Recent Projects</h2>
+            <div className="space-y-1.5">
+              {recentProjects.map((entry) => (
+                <div
+                  key={entry.name}
+                  className="flex items-center justify-between px-4 py-2.5 bg-zinc-900 rounded-lg border border-zinc-800 hover:border-zinc-600 transition-colors group"
+                >
+                  <button
+                    onClick={() => handleOpenRecent(entry)}
+                    className="flex-1 text-left"
+                  >
+                    <span className="text-sm font-medium text-zinc-200">{entry.name}</span>
+                    <span className="text-[11px] text-zinc-600 ml-2">
+                      {formatRelativeTime(entry.openedAt)}
+                    </span>
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleRemoveRecent(entry.name); }}
+                    className="text-xs text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity ml-3"
+                    title="Remove from recents"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="mt-4 bg-red-900/30 border border-red-700 rounded p-3 text-sm text-red-400">
@@ -209,12 +323,31 @@ function FsAccessProjectSelector({ onAdapterReady }: { onAdapterReady: (adapter:
           </div>
         )}
 
-        <p className="mt-8 text-xs text-zinc-600">
+        <p className="mt-6 text-xs text-zinc-600 text-center">
           Static mode — file changes are saved directly to your local folder via the File System Access API.
         </p>
       </div>
+
+      <NewProjectWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        onConfirm={handleNewProject}
+        showNameField={false}
+      />
     </div>
   );
+}
+
+function formatRelativeTime(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(timestamp).toLocaleDateString();
 }
 
 function assert(condition: boolean, message: string): asserts condition {

@@ -1,26 +1,46 @@
 /**
- * Persist and restore a FileSystemDirectoryHandle via IndexedDB.
+ * Persist and restore FileSystemDirectoryHandles via IndexedDB.
  *
  * FileSystemDirectoryHandle is a structured-cloneable object, so it can be
  * stored directly in IndexedDB. On restore, we call requestPermission()
  * to re-verify readwrite access (Chrome grants this silently if the user
  * previously approved and the origin hasn't changed).
+ *
+ * Two stores:
+ *   - "handles" (legacy): stores the single most-recently-opened handle
+ *   - "recentProjects": stores an array of { name, handle, openedAt } entries
  */
 
 const DB_NAME = "deckode";
 const STORE_NAME = "handles";
+const RECENT_STORE = "recentProjects";
 const KEY = "projectDir";
+const MAX_RECENT = 20;
+
+export interface RecentProject {
+  name: string;
+  handle: FileSystemDirectoryHandle;
+  openedAt: number;
+}
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      req.result.createObjectStore(STORE_NAME);
+    const req = indexedDB.open(DB_NAME, 2);
+    req.onupgradeneeded = (event) => {
+      const db = req.result;
+      if (event.oldVersion < 1) {
+        db.createObjectStore(STORE_NAME);
+      }
+      if (event.oldVersion < 2) {
+        db.createObjectStore(RECENT_STORE, { keyPath: "name" });
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
 }
+
+// ── Single handle (legacy, used for auto-restore on load) ──
 
 export async function saveHandle(handle: FileSystemDirectoryHandle): Promise<void> {
   const db = await openDB();
@@ -44,7 +64,6 @@ export async function restoreHandle(): Promise<FileSystemDirectoryHandle | null>
   if (!handle) return null;
 
   // Re-verify permission (may prompt user or succeed silently)
-  // requestPermission is not in the default TS lib types yet
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const perm = await (handle as any).requestPermission({ mode: "readwrite" });
   if (perm !== "granted") return null;
@@ -57,6 +76,64 @@ export async function clearHandle(): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readwrite");
     tx.objectStore(STORE_NAME).delete(KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// ── Recent projects list ──
+
+export async function addRecentProject(handle: FileSystemDirectoryHandle): Promise<void> {
+  const db = await openDB();
+  const entry: RecentProject = {
+    name: handle.name,
+    handle,
+    openedAt: Date.now(),
+  };
+
+  // Upsert by name (keyPath)
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(RECENT_STORE, "readwrite");
+    tx.objectStore(RECENT_STORE).put(entry);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+
+  // Trim to MAX_RECENT entries (keep most recent)
+  const all = await listRecentProjects();
+  if (all.length > MAX_RECENT) {
+    const toRemove = all.slice(MAX_RECENT);
+    const db2 = await openDB();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db2.transaction(RECENT_STORE, "readwrite");
+      const store = tx.objectStore(RECENT_STORE);
+      for (const entry of toRemove) {
+        store.delete(entry.name);
+      }
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+}
+
+export async function listRecentProjects(): Promise<RecentProject[]> {
+  const db = await openDB();
+  const entries: RecentProject[] = await new Promise((resolve, reject) => {
+    const tx = db.transaction(RECENT_STORE, "readonly");
+    const req = tx.objectStore(RECENT_STORE).getAll();
+    req.onsuccess = () => resolve(req.result ?? []);
+    req.onerror = () => reject(req.error);
+  });
+  // Sort by openedAt descending (most recent first)
+  entries.sort((a, b) => b.openedAt - a.openedAt);
+  return entries;
+}
+
+export async function removeRecentProject(name: string): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(RECENT_STORE, "readwrite");
+    tx.objectStore(RECENT_STORE).delete(name);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
