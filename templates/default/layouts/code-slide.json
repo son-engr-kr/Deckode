@@ -1,0 +1,25 @@
+{
+  "title": "Code Slide",
+  "slide": {
+    "id": "__LAYOUT__",
+    "background": { "color": "#0f172a" },
+    "elements": [
+      {
+        "id": "heading",
+        "type": "text",
+        "content": "## Code Example",
+        "position": { "x": 60, "y": 30 },
+        "size": { "w": 840, "h": 50 },
+        "style": { "fontSize": 28, "color": "#f8fafc" }
+      },
+      {
+        "id": "code-block",
+        "type": "code",
+        "content": "function hello() {\n  console.log(\"Hello, Deckode!\");\n}",
+        "position": { "x": 60, "y": 100 },
+        "size": { "w": 840, "h": 380 },
+        "style": { "language": "typescript", "theme": "github-dark" }
+      }
+    ]
+  }
+}

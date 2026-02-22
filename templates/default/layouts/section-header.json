@@ -1,0 +1,17 @@
+{
+  "title": "Section Header",
+  "slide": {
+    "id": "__LAYOUT__",
+    "background": { "color": "#1e293b" },
+    "elements": [
+      {
+        "id": "section-title",
+        "type": "text",
+        "content": "## Section Title",
+        "position": { "x": 80, "y": 220 },
+        "size": { "w": 800, "h": 80 },
+        "style": { "fontSize": 40, "color": "#f8fafc", "align": "center" }
+      }
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "title": "Title Slide",
+  "slide": {
+    "id": "__LAYOUT__",
+    "background": { "color": "#0f172a" },
+    "elements": [
+      {
+        "id": "title",
+        "type": "text",
+        "content": "# Presentation Title",
+        "position": { "x": 80, "y": 180 },
+        "size": { "w": 800, "h": 100 },
+        "style": { "fontSize": 48, "color": "#f8fafc", "align": "center" }
+      },
+      {
+        "id": "subtitle",
+        "type": "text",
+        "content": "Your subtitle here",
+        "position": { "x": 200, "y": 300 },
+        "size": { "w": 560, "h": 50 },
+        "style": { "fontSize": 24, "color": "#94a3b8", "align": "center" }
+      }
+    ]
+  }
+}

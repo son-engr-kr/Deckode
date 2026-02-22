@@ -9,6 +9,8 @@ import {
   uploadAsset as apiUploadAsset,
   renderTikz as apiRenderTikz,
   listComponents as apiListComponents,
+  listLayouts as apiListLayouts,
+  loadLayout as apiLoadLayout,
 } from "@/utils/api";
 
 export class ViteApiAdapter implements FileSystemAdapter {
@@ -61,6 +63,14 @@ export class ViteApiAdapter implements FileSystemAdapter {
 
   async listComponents(): Promise<string[]> {
     return apiListComponents(this.projectName);
+  }
+
+  async listLayouts() {
+    return apiListLayouts(this.projectName);
+  }
+
+  async loadLayout(layoutName: string) {
+    return apiLoadLayout(this.projectName, layoutName);
   }
 }
 

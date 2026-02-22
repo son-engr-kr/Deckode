@@ -11,6 +11,11 @@ export interface TikzResult {
   error?: string;
 }
 
+export interface LayoutInfo {
+  name: string;
+  title: string;
+}
+
 export interface FileSystemAdapter {
   loadDeck(): Promise<Deck>;
   saveDeck(deck: Deck): Promise<void>;
@@ -25,6 +30,8 @@ export interface FileSystemAdapter {
     preamble?: string,
   ): Promise<{ ok: true; svgUrl: string } | { ok: false; error: string }>;
   listComponents(): Promise<string[]>;
+  listLayouts(): Promise<LayoutInfo[]>;
+  loadLayout(layoutName: string): Promise<import("@/types/deck").Slide>;
   readonly mode: "vite" | "fs-access";
   readonly projectName: string;
 }

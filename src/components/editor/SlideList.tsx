@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import {
   DndContext,
   closestCenter,
@@ -16,7 +16,9 @@ import { CSS } from "@dnd-kit/utilities";
 import { useDeckStore } from "@/stores/deckStore";
 import { SlideRenderer } from "@/components/renderer/SlideRenderer";
 import { nextSlideId } from "@/utils/id";
+import { useAdapter } from "@/contexts/AdapterContext";
 import type { Slide, DeckTheme } from "@/types/deck";
+import type { LayoutInfo } from "@/adapters/types";
 
 const THUMB_SCALE = 0.15;
 const THUMB_W = Math.round(960 * THUMB_SCALE);
@@ -39,12 +41,21 @@ export function SlideList() {
   const addSlide = useDeckStore((s) => s.addSlide);
   const deleteSlide = useDeckStore((s) => s.deleteSlide);
   const moveSlide = useDeckStore((s) => s.moveSlide);
+  const adapter = useAdapter();
   const listRef = useRef<HTMLDivElement>(null);
+  const [showLayoutPicker, setShowLayoutPicker] = useState(false);
+  const [layouts, setLayouts] = useState<LayoutInfo[]>([]);
 
   // Require 5px movement before drag starts (so clicks still work)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
+
+  // Load layouts when picker opens
+  useEffect(() => {
+    if (!showLayoutPicker) return;
+    adapter.listLayouts().then(setLayouts);
+  }, [showLayoutPicker, adapter]);
 
   // Auto-scroll to current slide
   useEffect(() => {
@@ -61,6 +72,25 @@ export function SlideList() {
     const lastIndex = deck.slides.length - 1;
     addSlide(slide, lastIndex);
     setCurrentSlide(lastIndex + 1);
+  };
+
+  const handleAddFromLayout = async (layoutName: string) => {
+    const templateSlide = await adapter.loadLayout(layoutName);
+    // Assign fresh IDs so multiple slides from the same layout don't collide
+    const slideId = nextSlideId();
+    const slide: Slide = {
+      ...templateSlide,
+      id: slideId,
+      layout: layoutName,
+      elements: templateSlide.elements.map((el: any) => ({
+        ...el,
+        id: `${slideId}-${el.id}`,
+      })),
+    };
+    const lastIndex = deck.slides.length - 1;
+    addSlide(slide, lastIndex);
+    setCurrentSlide(lastIndex + 1);
+    setShowLayoutPicker(false);
   };
 
   const handleDeleteSlide = (slideId: string, index: number) => {
@@ -123,14 +153,48 @@ export function SlideList() {
         </SortableContext>
       </DndContext>
 
-      <button
-        onClick={handleAddSlide}
-        className="rounded border-2 border-dashed border-zinc-700 hover:border-zinc-500 text-zinc-500 hover:text-zinc-300 transition-colors flex items-center justify-center text-lg shrink-0"
-        style={{ width: THUMB_W + 6, height: THUMB_H + 6 }}
-        title="Add slide"
-      >
-        +
-      </button>
+      {/* Add slide buttons */}
+      <div className="flex gap-1 shrink-0" style={{ width: THUMB_W + 6 }}>
+        <button
+          onClick={handleAddSlide}
+          className="flex-1 rounded border-2 border-dashed border-zinc-700 hover:border-zinc-500 text-zinc-500 hover:text-zinc-300 transition-colors flex items-center justify-center text-lg"
+          style={{ height: THUMB_H + 6 }}
+          title="Add blank slide"
+        >
+          +
+        </button>
+        <button
+          onClick={() => setShowLayoutPicker(!showLayoutPicker)}
+          className={`w-8 rounded border-2 transition-colors flex items-center justify-center text-[10px] ${
+            showLayoutPicker
+              ? "border-blue-500 text-blue-400"
+              : "border-dashed border-zinc-700 hover:border-zinc-500 text-zinc-500 hover:text-zinc-300"
+          }`}
+          style={{ height: THUMB_H + 6 }}
+          title="Add from layout"
+        >
+          L
+        </button>
+      </div>
+
+      {/* Layout picker dropdown */}
+      {showLayoutPicker && (
+        <div className="shrink-0 rounded bg-zinc-900 border border-zinc-700 p-1.5" style={{ width: THUMB_W + 6 }}>
+          <div className="text-[9px] text-zinc-500 uppercase tracking-wider mb-1 px-1">Layouts</div>
+          {layouts.length === 0 && (
+            <div className="text-[10px] text-zinc-600 px-1">No layouts found</div>
+          )}
+          {layouts.map((layout) => (
+            <button
+              key={layout.name}
+              onClick={() => handleAddFromLayout(layout.name)}
+              className="w-full text-left text-[11px] px-1.5 py-1 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+            >
+              {layout.title}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -169,6 +169,60 @@ export function deckApiPlugin(): Plugin {
         jsonResponse(res, 200, { components });
       });
 
+      // -- List layouts: GET /api/list-layouts?project=name --
+
+      server.middlewares.use("/api/list-layouts", (req, res) => {
+        const project = getProjectParam(req);
+
+        // Merge built-in layouts + project-level layouts (project overrides built-in)
+        const builtinDir = path.resolve(process.cwd(), TEMPLATES_DIR, "default", "layouts");
+        const projectLayoutDir = path.resolve(projectDir(project), "layouts");
+
+        const layouts = new Map<string, { name: string; title: string }>();
+
+        // Built-in layouts
+        if (fs.existsSync(builtinDir)) {
+          for (const f of fs.readdirSync(builtinDir)) {
+            if (!f.endsWith(".json")) continue;
+            const name = f.replace(/\.json$/, "");
+            const data = JSON.parse(fs.readFileSync(path.resolve(builtinDir, f), "utf-8"));
+            layouts.set(name, { name, title: data.title ?? name });
+          }
+        }
+
+        // Project-level layouts (override built-in)
+        if (fs.existsSync(projectLayoutDir)) {
+          for (const f of fs.readdirSync(projectLayoutDir)) {
+            if (!f.endsWith(".json")) continue;
+            const name = f.replace(/\.json$/, "");
+            const data = JSON.parse(fs.readFileSync(path.resolve(projectLayoutDir, f), "utf-8"));
+            layouts.set(name, { name, title: data.title ?? name });
+          }
+        }
+
+        jsonResponse(res, 200, { layouts: Array.from(layouts.values()) });
+      });
+
+      // -- Load layout: GET /api/load-layout?project=name&layout=name --
+
+      server.middlewares.use("/api/load-layout", (req, res) => {
+        const project = getProjectParam(req);
+        const url = new URL(req.url ?? "/", "http://localhost");
+        const layoutName = url.searchParams.get("layout");
+        assert(typeof layoutName === "string" && layoutName.length > 0, "Missing ?layout= query parameter");
+        assert(/^[a-zA-Z0-9_-]+$/.test(layoutName), `Invalid layout name: ${layoutName}`);
+
+        // Project-level layout takes precedence
+        const projectLayoutPath = path.resolve(projectDir(project), "layouts", `${layoutName}.json`);
+        const builtinLayoutPath = path.resolve(process.cwd(), TEMPLATES_DIR, "default", "layouts", `${layoutName}.json`);
+
+        const layoutPath = fs.existsSync(projectLayoutPath) ? projectLayoutPath : builtinLayoutPath;
+        assert(fs.existsSync(layoutPath), `Layout "${layoutName}" not found`);
+
+        const data = JSON.parse(fs.readFileSync(layoutPath, "utf-8"));
+        jsonResponse(res, 200, { slide: data.slide });
+      });
+
       // -- Static serving: /assets/{project}/* --
 
       server.middlewares.use("/assets", (req, res, next) => {

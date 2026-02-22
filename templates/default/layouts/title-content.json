@@ -1,0 +1,25 @@
+{
+  "title": "Title + Content",
+  "slide": {
+    "id": "__LAYOUT__",
+    "background": { "color": "#0f172a" },
+    "elements": [
+      {
+        "id": "heading",
+        "type": "text",
+        "content": "## Slide Title",
+        "position": { "x": 60, "y": 30 },
+        "size": { "w": 840, "h": 60 },
+        "style": { "fontSize": 32, "color": "#f8fafc" }
+      },
+      {
+        "id": "body",
+        "type": "text",
+        "content": "Body text goes here.\n\n- Point one\n- Point two\n- Point three",
+        "position": { "x": 60, "y": 110 },
+        "size": { "w": 840, "h": 380 },
+        "style": { "fontSize": 20, "color": "#cbd5e1" }
+      }
+    ]
+  }
+}

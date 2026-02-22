@@ -79,6 +79,20 @@ export async function listComponents(project: string): Promise<string[]> {
   return data.components;
 }
 
+export async function listLayouts(project: string): Promise<{ name: string; title: string }[]> {
+  const res = await fetch(`/api/list-layouts?project=${encodeURIComponent(project)}`);
+  assert(res.ok, `Failed to list layouts: ${res.status}`);
+  const data = await res.json();
+  return data.layouts;
+}
+
+export async function loadLayout(project: string, layoutName: string): Promise<any> {
+  const res = await fetch(`/api/load-layout?project=${encodeURIComponent(project)}&layout=${encodeURIComponent(layoutName)}`);
+  assert(res.ok, `Failed to load layout: ${res.status}`);
+  const data = await res.json();
+  return data.slide;
+}
+
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(`[API] ${message}`);
 }

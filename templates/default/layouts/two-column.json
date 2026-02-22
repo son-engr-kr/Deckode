@@ -1,0 +1,33 @@
+{
+  "title": "Two Columns",
+  "slide": {
+    "id": "__LAYOUT__",
+    "background": { "color": "#0f172a" },
+    "elements": [
+      {
+        "id": "heading",
+        "type": "text",
+        "content": "## Slide Title",
+        "position": { "x": 60, "y": 30 },
+        "size": { "w": 840, "h": 60 },
+        "style": { "fontSize": 32, "color": "#f8fafc" }
+      },
+      {
+        "id": "left-col",
+        "type": "text",
+        "content": "**Left column**\n\nContent here",
+        "position": { "x": 60, "y": 110 },
+        "size": { "w": 400, "h": 380 },
+        "style": { "fontSize": 18, "color": "#cbd5e1" }
+      },
+      {
+        "id": "right-col",
+        "type": "text",
+        "content": "**Right column**\n\nContent here",
+        "position": { "x": 500, "y": 110 },
+        "size": { "w": 400, "h": 380 },
+        "style": { "fontSize": 18, "color": "#cbd5e1" }
+      }
+    ]
+  }
+}

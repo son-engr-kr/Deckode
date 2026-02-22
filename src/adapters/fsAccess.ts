@@ -164,6 +164,39 @@ export class FsAccessAdapter implements FileSystemAdapter {
     return names;
   }
 
+  async listLayouts(): Promise<{ name: string; title: string }[]> {
+    const layouts: { name: string; title: string }[] = [];
+    let layoutsDir: FileSystemDirectoryHandle;
+    try {
+      layoutsDir = await this.dirHandle.getDirectoryHandle("layouts");
+    } catch {
+      return layouts;
+    }
+    for await (const [name, handle] of layoutsDir as any) {
+      if (handle.kind === "file" && name.endsWith(".json")) {
+        const file = await (handle as FileSystemFileHandle).getFile();
+        const data = JSON.parse(await file.text());
+        const layoutName = name.replace(/\.json$/, "");
+        layouts.push({ name: layoutName, title: data.title ?? layoutName });
+      }
+    }
+    return layouts;
+  }
+
+  async loadLayout(layoutName: string): Promise<import("@/types/deck").Slide> {
+    let layoutsDir: FileSystemDirectoryHandle;
+    try {
+      layoutsDir = await this.dirHandle.getDirectoryHandle("layouts");
+    } catch {
+      throw new Error(`[FsAccessAdapter] No layouts/ directory found`);
+    }
+    const fileHandle = await layoutsDir.getFileHandle(`${layoutName}.json`);
+    const file = await fileHandle.getFile();
+    const data = JSON.parse(await file.text());
+    assert(data.slide, `Layout "${layoutName}" missing "slide" property`);
+    return data.slide;
+  }
+
   async renderTikz(
     elementId: string,
     content: string,
