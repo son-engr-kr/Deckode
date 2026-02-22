@@ -30,8 +30,12 @@ export function App() {
     }
   }, []);
 
-  const urlMode = new URLSearchParams(window.location.search).get("mode");
-  const isAudiencePopup = urlMode === "audience" || urlMode === "presenter";
+  // Capture URL mode once on mount — the URL sync effect below may strip
+  // query params before the next render, so we must read this eagerly.
+  const [isAudiencePopup] = useState(() => {
+    const mode = new URLSearchParams(window.location.search).get("mode");
+    return mode === "audience" || mode === "presenter";
+  });
 
   // Sync URL when project changes (dev mode only)
   useEffect(() => {
