@@ -1,10 +1,34 @@
 import type { Deck } from "@/types/deck";
 import type { FileSystemAdapter, ProjectInfo } from "./types";
+import type { NewProjectConfig } from "@/utils/projectTemplates";
 import { saveHandle, clearHandle } from "@/utils/handleStore";
+import { generateBlankDeck, generateWizardDeck } from "@/utils/projectTemplates";
+
+// Bundled template data for prod/FS Access mode (no server available)
+import exampleDeck from "../../templates/default/deck.json";
+import deckSchema from "@/schema/deck.schema.json";
+import aiGuideText from "../../docs/ai-slide-guide.md?raw";
+import layoutBlank from "../../templates/default/layouts/blank.json";
+import layoutTitle from "../../templates/default/layouts/title.json";
+import layoutTitleContent from "../../templates/default/layouts/title-content.json";
+import layoutTwoColumn from "../../templates/default/layouts/two-column.json";
+import layoutSectionHeader from "../../templates/default/layouts/section-header.json";
+import layoutCodeSlide from "../../templates/default/layouts/code-slide.json";
+import layoutImageLeft from "../../templates/default/layouts/image-left.json";
+
+const BUNDLED_LAYOUTS: Record<string, unknown> = {
+  "blank": layoutBlank,
+  "title": layoutTitle,
+  "title-content": layoutTitleContent,
+  "two-column": layoutTwoColumn,
+  "section-header": layoutSectionHeader,
+  "code-slide": layoutCodeSlide,
+  "image-left": layoutImageLeft,
+};
 
 export class FsAccessAdapter implements FileSystemAdapter {
   readonly mode = "fs-access" as const;
-  private dirHandle: FileSystemDirectoryHandle;
+  readonly dirHandle: FileSystemDirectoryHandle;
   private blobUrlCache = new Map<string, string>();
   readonly projectName: string;
 
@@ -33,6 +57,48 @@ export class FsAccessAdapter implements FileSystemAdapter {
     return clearHandle();
   }
 
+  /**
+   * Write a new project into the given directory handle.
+   * Creates deck.json, layouts/, and docs/ with AI discoverability files.
+   */
+  static async writeNewProject(
+    dirHandle: FileSystemDirectoryHandle,
+    config: NewProjectConfig,
+  ): Promise<void> {
+    // Check for existing deck.json to prevent overwrite
+    let exists = true;
+    try { await dirHandle.getFileHandle("deck.json"); } catch { exists = false; }
+    assert(!exists, "This folder already contains a deck.json. Pick an empty folder or remove the existing file.");
+
+    // Generate deck based on template kind
+    let deck: Deck;
+    if (config.template === "wizard" && config.wizard) {
+      deck = generateWizardDeck(config.wizard);
+    } else if (config.template === "blank") {
+      deck = generateBlankDeck(config.title);
+    } else {
+      // "example" — use bundled default deck
+      deck = JSON.parse(JSON.stringify(exampleDeck)) as Deck;
+      if (config.title) {
+        deck.meta.title = config.title;
+      }
+    }
+
+    // Write deck.json
+    await writeTextFile(dirHandle, "deck.json", JSON.stringify(deck, null, 2));
+
+    // Write layouts/
+    const layoutsDir = await dirHandle.getDirectoryHandle("layouts", { create: true });
+    for (const [name, data] of Object.entries(BUNDLED_LAYOUTS)) {
+      await writeTextFile(layoutsDir, `${name}.json`, JSON.stringify(data, null, 2));
+    }
+
+    // Write docs/
+    const docsDir = await dirHandle.getDirectoryHandle("docs", { create: true });
+    await writeTextFile(docsDir, "deck.schema.json", JSON.stringify(deckSchema, null, 2));
+    await writeTextFile(docsDir, "ai-slide-guide.md", aiGuideText);
+  }
+
   async loadDeck(): Promise<Deck> {
     const fileHandle = await this.dirHandle.getFileHandle("deck.json");
     const file = await fileHandle.getFile();
@@ -53,8 +119,8 @@ export class FsAccessAdapter implements FileSystemAdapter {
     return [{ name: this.projectName, title: deck.meta.title }];
   }
 
-  async createProject(_name: string, _title?: string): Promise<void> {
-    throw new Error("Creating projects is not supported in File System Access mode. Open a different folder instead.");
+  async createProject(_name: string, _config: NewProjectConfig): Promise<void> {
+    throw new Error("Creating projects is not supported in File System Access mode. Use writeNewProject() instead.");
   }
 
   async deleteProject(_name: string): Promise<void> {
@@ -224,6 +290,17 @@ export class FsAccessAdapter implements FileSystemAdapter {
 
     return { ok: true, svgUrl: storedPath };
   }
+}
+
+async function writeTextFile(
+  dirHandle: FileSystemDirectoryHandle,
+  name: string,
+  content: string,
+): Promise<void> {
+  const fh = await dirHandle.getFileHandle(name, { create: true });
+  const writable = await fh.createWritable();
+  await writable.write(content);
+  await writable.close();
 }
 
 function assert(condition: boolean, message: string): asserts condition {

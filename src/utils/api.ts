@@ -1,5 +1,6 @@
 import type { Deck } from "@/types/deck";
 import type { ProjectInfo } from "@/adapters/types";
+import type { NewProjectConfig } from "@/utils/projectTemplates";
 
 export type { ProjectInfo };
 
@@ -10,11 +11,11 @@ export async function listProjects(): Promise<ProjectInfo[]> {
   return data.projects;
 }
 
-export async function createProject(name: string, title?: string): Promise<void> {
+export async function createProject(name: string, config: NewProjectConfig): Promise<void> {
   const res = await fetch("/api/create-project", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, title }),
+    body: JSON.stringify({ name, ...config }),
   });
   assert(res.ok, `Failed to create project: ${res.status}`);
 }

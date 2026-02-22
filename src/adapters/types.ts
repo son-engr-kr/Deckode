@@ -1,4 +1,5 @@
 import type { Deck } from "@/types/deck";
+import type { NewProjectConfig } from "@/utils/projectTemplates";
 
 export interface ProjectInfo {
   name: string;
@@ -20,7 +21,7 @@ export interface FileSystemAdapter {
   loadDeck(): Promise<Deck>;
   saveDeck(deck: Deck): Promise<void>;
   listProjects(): Promise<ProjectInfo[]>;
-  createProject(name: string, title?: string): Promise<void>;
+  createProject(name: string, config: NewProjectConfig): Promise<void>;
   deleteProject(name: string): Promise<void>;
   uploadAsset(file: File): Promise<string>;
   resolveAssetUrl(path: string): string | Promise<string>;

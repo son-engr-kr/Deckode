@@ -5,6 +5,7 @@ import path from "path";
 import os from "os";
 import { execFile, execFileSync } from "child_process";
 import Ajv2020 from "ajv/dist/2020";
+import { generateWizardDeck } from "../utils/projectTemplates";
 
 const DECK_FILENAME = "deck.json";
 const PROJECT_DIR = "projects";
@@ -332,18 +333,53 @@ export function deckApiPlugin(): Plugin {
 
         fs.mkdirSync(dir, { recursive: true });
 
-        // Copy starter deck from templates/default/deck.json
-        const templatePath = path.resolve(process.cwd(), TEMPLATES_DIR, "default", DECK_FILENAME);
-        assert(fs.existsSync(templatePath), "Default template not found");
-        const template = JSON.parse(fs.readFileSync(templatePath, "utf-8"));
+        const templateKind: string = body.template ?? "example";
+        let deck: any;
 
-        // Override title if provided
-        if (body.title) {
-          template.meta = template.meta ?? {};
-          template.meta.title = body.title;
+        if (templateKind === "wizard" && body.wizard) {
+          deck = generateWizardDeck(body.wizard);
+        } else if (templateKind === "blank") {
+          const blankPath = path.resolve(process.cwd(), TEMPLATES_DIR, "blank", DECK_FILENAME);
+          assert(fs.existsSync(blankPath), "Blank template not found");
+          deck = JSON.parse(fs.readFileSync(blankPath, "utf-8"));
+          if (body.title) {
+            deck.meta = deck.meta ?? {};
+            deck.meta.title = body.title;
+          }
+        } else {
+          // "example" — current default behavior
+          const templatePath = path.resolve(process.cwd(), TEMPLATES_DIR, "default", DECK_FILENAME);
+          assert(fs.existsSync(templatePath), "Default template not found");
+          deck = JSON.parse(fs.readFileSync(templatePath, "utf-8"));
+          if (body.title) {
+            deck.meta = deck.meta ?? {};
+            deck.meta.title = body.title;
+          }
         }
 
-        saveDeck(deckPath(name), template);
+        saveDeck(deckPath(name), deck);
+
+        // Copy layouts into the project
+        const builtinLayoutDir = path.resolve(process.cwd(), TEMPLATES_DIR, "default", "layouts");
+        const projectLayoutDir = path.resolve(dir, "layouts");
+        if (fs.existsSync(builtinLayoutDir)) {
+          fs.cpSync(builtinLayoutDir, projectLayoutDir, { recursive: true });
+        }
+
+        // Copy AI discoverability docs
+        const docsDir = path.resolve(dir, "docs");
+        fs.mkdirSync(docsDir, { recursive: true });
+
+        const schemaSource = path.resolve(process.cwd(), "src", "schema", "deck.schema.json");
+        if (fs.existsSync(schemaSource)) {
+          fs.copyFileSync(schemaSource, path.resolve(docsDir, "deck.schema.json"));
+        }
+
+        const guideSource = path.resolve(process.cwd(), "docs", "ai-slide-guide.md");
+        if (fs.existsSync(guideSource)) {
+          fs.copyFileSync(guideSource, path.resolve(docsDir, "ai-slide-guide.md"));
+        }
+
         jsonResponse(res, 200, { ok: true, name });
       });
 

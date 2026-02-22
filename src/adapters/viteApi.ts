@@ -1,5 +1,6 @@
 import type { Deck } from "@/types/deck";
 import type { FileSystemAdapter, ProjectInfo } from "./types";
+import type { NewProjectConfig } from "@/utils/projectTemplates";
 import {
   listProjects as apiListProjects,
   createProject as apiCreateProject,
@@ -32,8 +33,8 @@ export class ViteApiAdapter implements FileSystemAdapter {
     return apiListProjects();
   }
 
-  async createProject(name: string, title?: string): Promise<void> {
-    await apiCreateProject(name, title);
+  async createProject(name: string, config: NewProjectConfig): Promise<void> {
+    await apiCreateProject(name, config);
   }
 
   async deleteProject(name: string): Promise<void> {
