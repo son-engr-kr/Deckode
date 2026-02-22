@@ -187,7 +187,7 @@ export function deckApiPlugin(): Plugin {
 
         const buffer = await readBinaryBody(req);
         fs.writeFileSync(path.resolve(dir, finalName), buffer);
-        jsonResponse(res, 200, { url: `/assets/${project}/${finalName}` });
+        jsonResponse(res, 200, { url: `./assets/${finalName}` });
       });
 
       // -- TikZ rendering endpoint --
@@ -276,6 +276,8 @@ export function deckApiPlugin(): Plugin {
           jsonResponse(res, 404, { error: "deck.json not found" });
           return;
         }
+        // Migrate legacy absolute asset paths → relative ./assets/... on first load
+        rewriteAssetUrls(filePath, project);
         const content = fs.readFileSync(filePath, "utf-8");
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(content);
@@ -531,24 +533,25 @@ function migrateToProjectDir() {
   }
 }
 
-/** Rewrite /assets/filename → /assets/{project}/filename in element src fields */
+/** Rewrite /assets/{project}/... → ./assets/... (and bare /assets/file → ./assets/file) */
 function rewriteAssetUrls(deckFilePath: string, project: string) {
   if (!fs.existsSync(deckFilePath)) return;
   const raw = fs.readFileSync(deckFilePath, "utf-8");
-  // Replace /assets/ refs that don't already have a project prefix
-  // Match /assets/ followed by a filename (not a valid project name + /)
+  // Match src or svgUrl values that start with /assets/
   const rewritten = raw.replace(
-    /("src"\s*:\s*"\/assets\/)([^"]+)"/g,
-    (match, prefix, rest) => {
-      // If the path already starts with a project-like segment followed by /,
-      // and that segment is the current project, skip it
-      if (rest.startsWith(`${project}/`)) return match;
-      return `${prefix}${project}/${rest}"`;
+    /"(src|svgUrl)"\s*:\s*"\/assets\/([^"]+)"/g,
+    (_match, prop, rest) => {
+      // Strip the project segment if present: /assets/{project}/foo → ./assets/foo
+      if (rest.startsWith(`${project}/`)) {
+        return `"${prop}": "./assets/${rest.slice(project.length + 1)}"`;
+      }
+      // Bare /assets/filename → ./assets/filename
+      return `"${prop}": "./assets/${rest}"`;
     },
   );
   if (rewritten !== raw) {
     fs.writeFileSync(deckFilePath, rewritten, "utf-8");
-    console.log(`[deckode] Rewrote asset URLs in ${deckFilePath}`);
+    console.log(`[deckode] Rewrote asset URLs to relative format in ${deckFilePath}`);
   }
 }
 
@@ -672,7 +675,7 @@ async function compileTikz(
   // Cleanup
   fs.rmSync(tmpDir, { recursive: true, force: true });
 
-  const svgUrl = `/assets/${project}/tikz/${elementId}.svg?v=${Date.now()}`;
+  const svgUrl = `./assets/tikz/${elementId}.svg?v=${Date.now()}`;
   return { ok: true, svgUrl };
 }
 

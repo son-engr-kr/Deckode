@@ -87,7 +87,7 @@ export class FsAccessAdapter implements FileSystemAdapter {
     await writable.write(file);
     await writable.close();
 
-    const storedPath = `/assets/${this.projectName}/${name}`;
+    const storedPath = `./assets/${name}`;
     // Pre-cache the blob URL
     const blob = new Blob([file], { type: file.type });
     const blobUrl = URL.createObjectURL(blob);
@@ -104,13 +104,19 @@ export class FsAccessAdapter implements FileSystemAdapter {
     const qIdx = path.indexOf("?");
     const cleanPath = qIdx === -1 ? path : path.slice(0, qIdx);
 
-    // Path format: /assets/{project}/{subdir.../filename}
-    const parts = cleanPath.replace(/^\//, "").split("/");
-    // Expected: ["assets", projectName, ...rest]
-    assert(parts.length >= 3, `Invalid asset path: ${path}`);
-
-    // Navigate from assets/ through any subdirectories to reach the file
-    const subParts = parts.slice(2); // everything after "assets/{projectName}"
+    // Support both new (./assets/...) and legacy (/assets/{project}/...) formats
+    let subParts: string[];
+    if (cleanPath.startsWith("./")) {
+      // New format: ./assets/subdir/filename
+      const parts = cleanPath.slice(2).split("/");
+      assert(parts.length >= 2 && parts[0] === "assets", `Invalid asset path: ${path}`);
+      subParts = parts.slice(1); // everything after "assets"
+    } else {
+      // Legacy format: /assets/{project}/subdir/filename
+      const parts = cleanPath.replace(/^\//, "").split("/");
+      assert(parts.length >= 3, `Invalid asset path: ${path}`);
+      subParts = parts.slice(2); // everything after "assets/{projectName}"
+    }
     const fileName = subParts.pop()!;
     assert(fileName.length > 0, `Empty filename in asset path: ${path}`);
 
@@ -161,7 +167,7 @@ export class FsAccessAdapter implements FileSystemAdapter {
     // Cache a blob URL for immediate display.
     // Append ?v=timestamp so useAssetUrl detects the change (same element ID
     // produces the same base path, so React's useEffect wouldn't re-fire).
-    const basePath = `/assets/${this.projectName}/tikz/${elementId}.svg`;
+    const basePath = `./assets/tikz/${elementId}.svg`;
     const storedPath = `${basePath}?v=${Date.now()}`;
     const blob = new Blob([svgMarkup], { type: "image/svg+xml" });
     const blobUrl = URL.createObjectURL(blob);

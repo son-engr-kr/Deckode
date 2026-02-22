@@ -42,6 +42,11 @@ export class ViteApiAdapter implements FileSystemAdapter {
   }
 
   resolveAssetUrl(path: string): string {
+    // Rewrite ./assets/foo → /assets/{projectName}/foo for the Vite static middleware
+    if (path.startsWith("./assets/")) {
+      return `/assets/${this.projectName}/${path.slice(9)}`;
+    }
+    // Legacy /assets/{project}/foo passes through unchanged
     return path;
   }
 
