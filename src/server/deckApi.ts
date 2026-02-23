@@ -114,6 +114,11 @@ export function deckApiPlugin(): Plugin {
   let validate: ReturnType<typeof createValidator>;
   let viteServer: Parameters<NonNullable<Plugin["configureServer"]>>[0];
 
+  /** Timestamp of the most recent save-deck write per project */
+  const lastSaveTs = new Map<string, number>();
+  /** Active fs.watch handles per project */
+  const watchers = new Map<string, fs.FSWatcher>();
+
   /** Notify the browser that deck.json was modified by an AI tool */
   function notifyDeckChanged(project: string) {
     viteServer.ws.send({
@@ -121,6 +126,29 @@ export function deckApiPlugin(): Plugin {
       event: "deckode:deck-changed",
       data: { project },
     });
+  }
+
+  function watchProject(project: string) {
+    if (watchers.has(project)) return;
+    const dp = deckPath(project);
+    if (!fs.existsSync(dp)) return;
+
+    let debounce: ReturnType<typeof setTimeout> | null = null;
+    const watcher = fs.watch(dp, () => {
+      if (debounce) clearTimeout(debounce);
+      debounce = setTimeout(() => {
+        const lastSave = lastSaveTs.get(project) ?? 0;
+        if (Date.now() - lastSave < 2000) return; // our own save
+        notifyDeckChanged(project);
+      }, 300);
+    });
+    watcher.on("error", () => unwatchProject(project));
+    watchers.set(project, watcher);
+  }
+
+  function unwatchProject(project: string) {
+    const w = watchers.get(project);
+    if (w) { w.close(); watchers.delete(project); }
   }
 
   return {
@@ -402,6 +430,7 @@ export function deckApiPlugin(): Plugin {
         // Migrate legacy absolute asset paths → relative ./assets/... on first load
         rewriteAssetUrls(filePath, project);
         const content = fs.readFileSync(filePath, "utf-8");
+        watchProject(project);
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(content);
       });
@@ -417,6 +446,7 @@ export function deckApiPlugin(): Plugin {
         const dp = deckPath(project);
         const dir = path.dirname(dp);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        lastSaveTs.set(project, Date.now());
         fs.writeFileSync(dp, body, "utf-8");
         jsonResponse(res, 200, { ok: true });
       });

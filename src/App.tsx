@@ -14,6 +14,7 @@ const IS_DEV = import.meta.env.DEV;
 export function App() {
   const currentProject = useDeckStore((s) => s.currentProject);
   const [adapter, setAdapter] = useState<FileSystemAdapter | null>(null);
+  const [externalChange, setExternalChange] = useState(false);
 
   // In dev mode, auto-open project from URL query param
   useEffect(() => {
@@ -49,21 +50,40 @@ export function App() {
     }
   }, [currentProject]);
 
-  // HMR: reload deck when AI modifies it via API (dev mode only)
+  // HMR: reload deck when deck.json changes on disk (dev mode only)
   useEffect(() => {
     if (!IS_DEV || !import.meta.hot) return;
     const handler = (data: { project: string }) => {
       const state = useDeckStore.getState();
       if (data.project !== state.currentProject || !adapter) return;
-      adapter.loadDeck().then((deck) => {
-        useDeckStore.getState().replaceDeck(deck);
-      });
+
+      if (!state.isDirty) {
+        // Clean → auto-reload
+        adapter.loadDeck().then((deck) => {
+          useDeckStore.getState().loadDeck(deck);
+        });
+      } else {
+        // Dirty → show conflict bar
+        setExternalChange(true);
+      }
     };
     import.meta.hot.on("deckode:deck-changed", handler);
     return () => {
       import.meta.hot!.off("deckode:deck-changed", handler);
     };
   }, [adapter]);
+
+  const handleReloadExternal = useCallback(() => {
+    if (!adapter) return;
+    adapter.loadDeck().then((deck) => {
+      useDeckStore.getState().loadDeck(deck);
+      setExternalChange(false);
+    });
+  }, [adapter]);
+
+  const handleKeepMine = useCallback(() => {
+    setExternalChange(false);
+  }, []);
 
   const handleAdapterReady = useCallback((newAdapter: FileSystemAdapter) => {
     setAdapter(newAdapter);
@@ -91,6 +111,23 @@ export function App() {
 
   return (
     <AdapterProvider adapter={adapter}>
+      {externalChange && (
+        <div className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center gap-3 px-4 py-2 bg-amber-600 text-white text-sm font-medium shadow-lg">
+          <span>deck.json was modified externally</span>
+          <button
+            onClick={handleReloadExternal}
+            className="px-2 py-0.5 rounded bg-white text-amber-700 font-semibold hover:bg-amber-50 transition-colors"
+          >
+            Reload
+          </button>
+          <button
+            onClick={handleKeepMine}
+            className="px-2 py-0.5 rounded bg-amber-700 text-amber-100 hover:bg-amber-800 transition-colors"
+          >
+            Keep mine
+          </button>
+        </div>
+      )}
       {isAudiencePopup ? <PresenterView /> : <EditorLayout />}
     </AdapterProvider>
   );
