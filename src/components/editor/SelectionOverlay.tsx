@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState } from "react";
 import { motion } from "framer-motion";
 import { useDeckStore, setDeckDragging } from "@/stores/deckStore";
 import type { Slide, SlideElement } from "@/types/deck";
@@ -9,11 +9,21 @@ interface Props {
   scale: number;
 }
 
+interface ContextMenuState {
+  x: number;
+  y: number;
+  slideId: string;
+  elementId: string;
+}
+
 export function SelectionOverlay({ slide, scale }: Props) {
   const selectedElementId = useDeckStore((s) => s.selectedElementId);
   const highlightedElementIds = useDeckStore((s) => s.highlightedElementIds);
   const selectElement = useDeckStore((s) => s.selectElement);
   const updateElement = useDeckStore((s) => s.updateElement);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
 
   return (
     <div
@@ -48,9 +58,19 @@ export function SelectionOverlay({ slide, scale }: Props) {
               },
             } as Partial<SlideElement>);
           }}
+          onContextMenu={(x, y) => {
+            selectElement(element.id);
+            setContextMenu({ x, y, slideId: slide.id, elementId: element.id });
+          }}
           scale={scale}
         />
       ))}
+      {contextMenu && (
+        <ElementContextMenu
+          {...contextMenu}
+          onClose={closeContextMenu}
+        />
+      )}
     </div>
   );
 }
@@ -65,10 +85,11 @@ interface InteractiveProps {
   onSelect: () => void;
   onMove: (dx: number, dy: number) => void;
   onResize: (dx: number, dy: number, dw: number, dh: number) => void;
+  onContextMenu: (x: number, y: number) => void;
   scale: number;
 }
 
-function InteractiveElement({ element, isSelected, isHighlighted, onSelect, onMove, onResize, scale }: InteractiveProps) {
+function InteractiveElement({ element, isSelected, isHighlighted, onSelect, onMove, onResize, onContextMenu, scale }: InteractiveProps) {
   const dragStart = useRef<{ x: number; y: number; ex: number; ey: number } | null>(null);
 
   const handleMouseDown = useCallback(
@@ -106,6 +127,15 @@ function InteractiveElement({ element, isSelected, isHighlighted, onSelect, onMo
       window.addEventListener("mouseup", handleMouseUp);
     },
     [element.position.x, element.position.y, scale, onSelect, onMove],
+  );
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onContextMenu(element.position.x + e.nativeEvent.offsetX, element.position.y + e.nativeEvent.offsetY);
+    },
+    [element.position.x, element.position.y, onContextMenu],
   );
 
   const handleResizeMouseDown = useCallback(
@@ -192,6 +222,7 @@ function InteractiveElement({ element, isSelected, isHighlighted, onSelect, onMo
       animate={{ boxShadow: "0 0 0 0px rgba(34,197,94,0)" }}
       transition={{ duration: 0.8 }}
       onMouseDown={handleMouseDown}
+      onContextMenu={handleContextMenu}
     >
       {/* Transparent overlay to capture mouse events */}
       <div className="absolute inset-0" />
@@ -213,6 +244,94 @@ function InteractiveElement({ element, isSelected, isHighlighted, onSelect, onMo
     </motion.div>
   );
 }
+
+// ── Context Menu ──────────────────────────────────────────────────
+
+function ElementContextMenu({
+  x,
+  y,
+  slideId,
+  elementId,
+  onClose,
+}: ContextMenuState & { onClose: () => void }) {
+  const bringToFront = useDeckStore((s) => s.bringToFront);
+  const sendToBack = useDeckStore((s) => s.sendToBack);
+  const duplicateElement = useDeckStore((s) => s.duplicateElement);
+  const deleteElement = useDeckStore((s) => s.deleteElement);
+
+  const handleAction = useCallback(
+    (action: () => void) => {
+      action();
+      onClose();
+    },
+    [onClose],
+  );
+
+  return (
+    <>
+      {/* Backdrop to close menu */}
+      <div
+        className="fixed inset-0"
+        style={{ pointerEvents: "auto" }}
+        onMouseDown={onClose}
+        onContextMenu={(e) => { e.preventDefault(); onClose(); }}
+      />
+      <div
+        className="absolute bg-zinc-800 border border-zinc-700 rounded-md shadow-xl py-1 min-w-[160px] text-xs"
+        style={{ left: x, top: y, pointerEvents: "auto", zIndex: 50 }}
+      >
+        <ContextMenuItem
+          label="Bring to Front"
+          onClick={() => handleAction(() => bringToFront(slideId, elementId))}
+        />
+        <ContextMenuItem
+          label="Send to Back"
+          onClick={() => handleAction(() => sendToBack(slideId, elementId))}
+        />
+        <div className="h-px bg-zinc-700 my-1" />
+        <ContextMenuItem
+          label="Duplicate"
+          shortcut="Ctrl+D"
+          onClick={() => handleAction(() => duplicateElement(slideId, elementId))}
+        />
+        <ContextMenuItem
+          label="Delete"
+          shortcut="Del"
+          danger
+          onClick={() => handleAction(() => deleteElement(slideId, elementId))}
+        />
+      </div>
+    </>
+  );
+}
+
+function ContextMenuItem({
+  label,
+  shortcut,
+  danger,
+  onClick,
+}: {
+  label: string;
+  shortcut?: string;
+  danger?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={`w-full text-left px-3 py-1.5 flex items-center justify-between gap-4 transition-colors ${
+        danger
+          ? "text-red-400 hover:bg-red-900/30"
+          : "text-zinc-300 hover:bg-zinc-700"
+      }`}
+      onClick={onClick}
+    >
+      <span>{label}</span>
+      {shortcut && <span className="text-zinc-500">{shortcut}</span>}
+    </button>
+  );
+}
+
+// ── Helpers ────────────────────────────────────────────────────────
 
 const HANDLE_POSITIONS: Record<Corner, string> = {
   nw: "-top-1 -left-1 cursor-nw-resize",

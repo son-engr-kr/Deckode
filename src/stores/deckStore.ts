@@ -47,6 +47,8 @@ interface DeckState {
   updateTheme: (patch: Partial<DeckTheme>) => void;
   highlightElements: (ids: string[]) => void;
   patchElementById: (elementId: string, patch: Partial<SlideElement>) => void;
+  bringToFront: (slideId: string, elementId: string) => void;
+  sendToBack: (slideId: string, elementId: string) => void;
 }
 
 let highlightTimer: ReturnType<typeof setTimeout> | null = null;
@@ -338,6 +340,32 @@ export const useDeckStore = create<DeckState>()(
             highlightTimer = null;
           }, 800);
         },
+
+        bringToFront: (slideId, elementId) =>
+          set((state) => {
+            assert(state.deck !== null, "No deck loaded");
+            const slide = state.deck.slides.find((s) => s.id === slideId);
+            assert(slide !== undefined, `Slide ${slideId} not found`);
+            const idx = slide.elements.findIndex((e) => e.id === elementId);
+            assert(idx !== -1, `Element ${elementId} not found`);
+            if (idx === slide.elements.length - 1) return; // already front
+            const [el] = slide.elements.splice(idx, 1);
+            slide.elements.push(el!);
+            state.isDirty = true;
+          }),
+
+        sendToBack: (slideId, elementId) =>
+          set((state) => {
+            assert(state.deck !== null, "No deck loaded");
+            const slide = state.deck.slides.find((s) => s.id === slideId);
+            assert(slide !== undefined, `Slide ${slideId} not found`);
+            const idx = slide.elements.findIndex((e) => e.id === elementId);
+            assert(idx !== -1, `Element ${elementId} not found`);
+            if (idx === 0) return; // already back
+            const [el] = slide.elements.splice(idx, 1);
+            slide.elements.unshift(el!);
+            state.isDirty = true;
+          }),
       })),
       {
         // Only track deck for undo/redo (selectedSlideIds is UI-only state)

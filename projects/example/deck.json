@@ -353,24 +353,6 @@
           }
         },
         {
-          "id": "shapes-opacity-rect",
-          "type": "shape",
-          "shape": "rectangle",
-          "position": {
-            "x": 60,
-            "y": 340
-          },
-          "size": {
-            "w": 400,
-            "h": 120
-          },
-          "style": {
-            "fill": "#10b981",
-            "opacity": 0.3,
-            "borderRadius": 16
-          }
-        },
-        {
           "id": "shapes-opacity-label",
           "type": "text",
           "content": "opacity: 0.3",
@@ -421,6 +403,24 @@
           "style": {
             "fontSize": 16,
             "color": "#94a3b8"
+          }
+        },
+        {
+          "id": "shapes-opacity-rect",
+          "type": "shape",
+          "shape": "rectangle",
+          "position": {
+            "x": 60,
+            "y": 340
+          },
+          "size": {
+            "w": 400,
+            "h": 120
+          },
+          "style": {
+            "fill": "#10b981",
+            "opacity": 0.3,
+            "borderRadius": 16
           }
         }
       ],
