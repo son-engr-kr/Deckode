@@ -30,6 +30,11 @@ export class FsAccessAdapter implements FileSystemAdapter {
   readonly dirHandle: FileSystemDirectoryHandle;
   private blobUrlCache = new Map<string, string>();
   readonly projectName: string;
+  private _lastSaveTs = 0;
+
+  get lastSaveTs(): number {
+    return this._lastSaveTs;
+  }
 
   constructor(dirHandle: FileSystemDirectoryHandle) {
     this.dirHandle = dirHandle;
@@ -120,6 +125,7 @@ export class FsAccessAdapter implements FileSystemAdapter {
     const writable = await fileHandle.createWritable();
     await writable.write(JSON.stringify(deck, null, 2));
     await writable.close();
+    this._lastSaveTs = Date.now();
   }
 
   async listProjects(): Promise<ProjectInfo[]> {

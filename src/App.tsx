@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useDeckStore } from "@/stores/deckStore";
 import { setStoreAdapter } from "@/stores/deckStore";
 import { EditorLayout } from "@/components/editor/EditorLayout";
@@ -8,6 +8,7 @@ import { AdapterProvider } from "@/contexts/AdapterContext";
 import { ViteApiAdapter } from "@/adapters/viteApi";
 import { loadDeckFromDisk } from "@/utils/api";
 import type { FileSystemAdapter } from "@/adapters/types";
+import type { FsAccessAdapter } from "@/adapters/fsAccess";
 
 const IS_DEV = import.meta.env.DEV;
 
@@ -71,6 +72,43 @@ export function App() {
     return () => {
       import.meta.hot!.off("deckode:deck-changed", handler);
     };
+  }, [adapter]);
+
+  // Polling: detect external deck.json changes in fs-access mode
+  const lastModifiedRef = useRef(0);
+  useEffect(() => {
+    if (!adapter || adapter.mode !== "fs-access") return;
+    const fsAdapter = adapter as FsAccessAdapter;
+
+    const poll = async () => {
+      const fileHandle = await fsAdapter.dirHandle.getFileHandle("deck.json");
+      const file = await fileHandle.getFile();
+      const modified = file.lastModified;
+
+      // Initialize on first poll
+      if (lastModifiedRef.current === 0) {
+        lastModifiedRef.current = modified;
+        return;
+      }
+
+      if (modified === lastModifiedRef.current) return;
+      lastModifiedRef.current = modified;
+
+      // Filter own saves (2s window)
+      if (Date.now() - fsAdapter.lastSaveTs < 2000) return;
+
+      const state = useDeckStore.getState();
+      if (!state.isDirty) {
+        fsAdapter.loadDeck().then((deck) => {
+          useDeckStore.getState().loadDeck(deck);
+        });
+      } else {
+        setExternalChange(true);
+      }
+    };
+
+    const id = setInterval(poll, 2000);
+    return () => clearInterval(id);
   }, [adapter]);
 
   const handleReloadExternal = useCallback(() => {
