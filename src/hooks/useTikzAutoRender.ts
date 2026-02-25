@@ -25,6 +25,10 @@ function collectStale(deck: Deck): { slideId: string; element: TikZElement }[] {
 /**
  * Subscribes to deck changes and sequentially renders any TikZ elements
  * whose content/preamble don't match their last rendered source.
+ *
+ * Handles both:
+ * - Initial load: renders any stale TikZ when the deck first becomes available
+ * - Live edits: re-renders when TikZ content changes while editing
  */
 export function useTikzAutoRender() {
   const adapter = useAdapter();
@@ -51,19 +55,26 @@ export function useTikzAutoRender() {
         for (const { slideId, element } of stale) {
           if (disposed) break;
           rendering.add(element.id);
-          const result = await adapterRef.current.renderTikz(
-            element.id,
-            element.content,
-            element.preamble,
-          );
-          rendering.delete(element.id);
-          if (disposed) break;
-          if (result.ok) {
-            useDeckStore.getState().updateElement(slideId, element.id, {
-              svgUrl: result.svgUrl,
-              renderedContent: element.content,
-              renderedPreamble: element.preamble ?? "",
-            });
+          try {
+            const result = await adapterRef.current.renderTikz(
+              element.id,
+              element.content,
+              element.preamble,
+            );
+            rendering.delete(element.id);
+            if (disposed) break;
+            if (result.ok) {
+              useDeckStore.getState().updateElement(slideId, element.id, {
+                svgUrl: result.svgUrl,
+                renderedContent: element.content,
+                renderedPreamble: element.preamble ?? "",
+              });
+            } else {
+              console.warn(`[TikzAutoRender] Failed to render ${element.id}:`, result.error);
+            }
+          } catch (err) {
+            rendering.delete(element.id);
+            console.warn(`[TikzAutoRender] Error rendering ${element.id}:`, err);
           }
         }
       } finally {
@@ -72,15 +83,29 @@ export function useTikzAutoRender() {
       if (!disposed) renderStale();
     }
 
-    renderStale();
+    // Initial render: the deck may already be loaded when the effect fires
+    // (e.g. navigating to a project via URL). Use a microtask to ensure
+    // React has finished committing the store update.
+    queueMicrotask(() => {
+      if (!disposed) renderStale();
+    });
+
+    // Also schedule a delayed check in case the initial call ran before
+    // the deck was ready (race with async project loading).
+    const initialTimer = setTimeout(() => {
+      if (!disposed) renderStale();
+    }, 500);
 
     const unsub = useDeckStore.subscribe(
       (state) => state.deck,
-      () => renderStale(),
+      () => {
+        if (!disposed) renderStale();
+      },
     );
 
     return () => {
       disposed = true;
+      clearTimeout(initialTimer);
       unsub();
     };
   }, []);
