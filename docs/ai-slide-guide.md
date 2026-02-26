@@ -358,6 +358,48 @@ When you create or modify a TikZ element, only set `content` and optionally `pre
 }
 ```
 
+**TikZJax Engine Limitations**:
+
+The TikZ renderer uses TikZJax (a WASM-based TeX engine), NOT full pdflatex. Key constraints:
+
+| Category | Supported (verified) | NOT Supported (verified) |
+|----------|---------------------|------------------------|
+| Math | `\mathbf`, `\mathrm`, `\hat`, `\vec`, `\in`, `\tau` | `\mathbb` (requires amssymb — silently fails) |
+| Packages | `tikz` core, `pgfplots` | `amssymb`, `amsfonts` |
+| Features | `\definecolor{...}{RGB}{r,g,b}`, `\footnotesize`, `\scriptsize`, `\bfseries` | Untested: `\colorlet`, complex TikZ libraries |
+
+Workarounds for common issues:
+- `\mathbb{R}` → use `\mathbf{R}` instead
+- If compilation fails silently (error: "Could not find file input.dvi"), the TikZ source has an unsupported command — simplify
+
+**SVG Fitting & Container Sizing**:
+
+The rendered SVG is scaled to fit inside the element's `size` container while preserving aspect ratio. This means:
+
+1. **Aspect ratio mismatch = clipping or dead space.** If the diagram is tall but the container is wide, the top/bottom will be cropped (or vice versa).
+2. **Design the diagram's aspect ratio to match the container.** For a container of `w: 880, h: 200` (ratio 4.4:1), the TikZ coordinate range should have a similar ratio (e.g., 8.8cm wide × 2cm tall).
+3. **Two-line nodes are taller than `minimum height`.** A node with `\\` (line break) expands beyond `minimum height` to fit text. Account for this when estimating total diagram height.
+4. **Leave margin in the TikZ coordinates.** If the top row of nodes is at `y=0`, the node border extends above `y=0`. Either shift content down (e.g., start at `y=-0.5`) or increase the container height.
+
+**Sizing rule of thumb**: For `\footnotesize` text with two-line nodes (`minimum height=0.7cm`), actual node height is ~0.9cm. For `\small` text, ~1.1cm.
+
+**Explicit bounding box (CRITICAL)**: TikZJax computes a tight SVG bounding box that often clips multi-line nodes. Always add an invisible `\path` rectangle as the first drawing command to force the correct bounding box:
+
+```latex
+% After \definecolor declarations, BEFORE any \node or \draw:
+\path (xmin, ymax) rectangle (xmax, ymin);
+```
+
+Calculate the bounds by taking the outermost node centers ± half their actual size, plus ~0.2cm padding. Example for a diagram with nodes from x=-1 to x=7 and y=+0.5 to y=-2:
+
+```latex
+\path (-1.2, 0.7) rectangle (7.2, -2.2);
+```
+
+This is the single most common cause of clipped TikZ diagrams. **Always include it.**
+
+**`backgroundColor`**: Must be `#rrggbb` — do NOT use `"transparent"` (causes console error).
+
 ### `"table"`
 
 Renders a data table with column headers and rows.
