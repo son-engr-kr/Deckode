@@ -9,51 +9,12 @@ import type {
   TableElement,
 } from "@/types/deck";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/types/deck";
+import { stripMarkdown, toHex, fetchImageAsBase64 } from "@/utils/exportUtils";
 
 const SLIDE_W = 10; // inches (standard 16:9 widescreen)
 const SLIDE_H = 5.625;
 const PX_TO_IN_X = SLIDE_W / CANVAS_WIDTH;
 const PX_TO_IN_Y = SLIDE_H / CANVAS_HEIGHT;
-
-function stripMarkdown(md: string): string {
-  return md
-    .replace(/\*\*(.*?)\*\*/g, "$1")
-    .replace(/\*(.*?)\*/g, "$1")
-    .replace(/\[(.*?)\]\(.*?\)/g, "$1")
-    .replace(/`(.*?)`/g, "$1")
-    .replace(/#{1,6}\s*/g, "")
-    .replace(/^\s*[-*]\s/gm, "")
-    .replace(/\$\$([\s\S]*?)\$\$/g, "$1") // block math
-    .replace(/\$(.*?)\$/g, "$1") // inline math
-    .trim();
-}
-
-function toHex(color: string | undefined): string | undefined {
-  if (!color || color === "transparent") return undefined;
-  return color.replace(/^#/, "");
-}
-
-async function fetchImageAsBase64(src: string): Promise<string | null> {
-  const urls = [
-    src,
-    src.startsWith("./") ? src.slice(2) : src,
-  ];
-  for (const url of urls) {
-    try {
-      const resp = await fetch(url);
-      if (!resp.ok) continue;
-      const blob = await resp.blob();
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(blob);
-      });
-    } catch {
-      continue;
-    }
-  }
-  return null;
-}
 
 export async function exportToPptx(deck: Deck): Promise<void> {
   const pres = new PptxGenJS();

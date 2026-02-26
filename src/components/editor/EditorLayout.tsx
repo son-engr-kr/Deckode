@@ -10,7 +10,7 @@ import { ElementPalette } from "./ElementPalette";
 import { SlideAnimationList } from "./SlideAnimationList";
 import { ThemePanel } from "./ThemePanel";
 import { PresentationMode } from "@/components/presenter/PresentationMode";
-import { PrintExport } from "@/components/export/PrintExport";
+import { exportToPdf } from "@/components/export/pdfExport";
 import { exportToPptx } from "@/components/export/pptxExport";
 import { useTikzAutoRender } from "@/hooks/useTikzAutoRender";
 
@@ -42,7 +42,6 @@ export function EditorLayout() {
   const [bottomPanel, setBottomPanel] = useState<BottomPanel>(null);
   const [rightPanel, setRightPanel] = useState<RightPanel>("properties");
   const [presenting, setPresenting] = useState(false);
-  const [printing, setPrinting] = useState(false);
   const isDirty = useDeckStore((s) => s.isDirty);
   const isSaving = useDeckStore((s) => s.isSaving);
   const saveToDisk = useDeckStore((s) => s.saveToDisk);
@@ -171,14 +170,8 @@ export function EditorLayout() {
     return <PresentationMode onExit={() => setPresenting(false)} />;
   }
 
-  // PrintExport portal renders off-screen; triggers window.print()
-  const printPortal = printing ? (
-    <PrintExport onDone={() => setPrinting(false)} />
-  ) : null;
-
   return (
     <div className="h-screen w-screen flex flex-col bg-zinc-950 text-white">
-      {printPortal}
       {/* Toolbar */}
       <div className="h-10 border-b border-zinc-800 flex items-center px-4 gap-4 shrink-0">
         <button
@@ -232,7 +225,10 @@ export function EditorLayout() {
           Present (F5)
         </button>
         <button
-          onClick={() => setPrinting(true)}
+          onClick={() => {
+            const deck = useDeckStore.getState().deck;
+            if (deck) exportToPdf(deck);
+          }}
           className="text-xs px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
         >
           PDF
