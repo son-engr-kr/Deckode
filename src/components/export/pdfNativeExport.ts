@@ -1,6 +1,6 @@
 import { jsPDF } from "jspdf";
-import "svg2pdf.js";
 import { codeToHtml } from "shiki";
+import katex from "katex";
 import type {
   Deck,
   SlideElement,
@@ -36,6 +36,9 @@ import {
   DEFAULT_CODE_THEME,
   DEFAULT_TABLE_SIZE,
 } from "@/utils/exportUtils";
+
+const MIN_FONT_SIZE = 6;
+const RASTER_SCALE = 2;
 
 // ---- Font mapping: custom fonts → jsPDF 14 standard fonts ----
 
@@ -77,11 +80,12 @@ interface TextRun {
   bold: boolean;
   italic: boolean;
   code: boolean;
+  math: boolean; // inline math — will be rasterized
 }
 
 function parseInlineMarkdown(text: string): TextRun[] {
   const runs: TextRun[] = [];
-  const re = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)/g;
+  const re = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)|(\$(.+?)\$)/g;
   let last = 0;
   let m: RegExpExecArray | null;
 
@@ -92,14 +96,17 @@ function parseInlineMarkdown(text: string): TextRun[] {
         bold: false,
         italic: false,
         code: false,
+        math: false,
       });
     }
     if (m[2] !== undefined) {
-      runs.push({ text: m[2], bold: true, italic: false, code: false });
+      runs.push({ text: m[2], bold: true, italic: false, code: false, math: false });
     } else if (m[4] !== undefined) {
-      runs.push({ text: m[4], bold: false, italic: true, code: false });
+      runs.push({ text: m[4], bold: false, italic: true, code: false, math: false });
     } else if (m[6] !== undefined) {
-      runs.push({ text: m[6], bold: false, italic: false, code: true });
+      runs.push({ text: m[6], bold: false, italic: false, code: true, math: false });
+    } else if (m[8] !== undefined) {
+      runs.push({ text: m[8], bold: false, italic: false, code: false, math: true });
     }
     last = m.index + m[0].length;
   }
@@ -110,11 +117,12 @@ function parseInlineMarkdown(text: string): TextRun[] {
       bold: false,
       italic: false,
       code: false,
+      math: false,
     });
   }
 
   if (runs.length === 0) {
-    runs.push({ text, bold: false, italic: false, code: false });
+    runs.push({ text, bold: false, italic: false, code: false, math: false });
   }
 
   return runs;
@@ -130,20 +138,56 @@ interface ParsedLine {
   bullet: boolean;
   fontScale: number; // heading scale
   isBold: boolean; // heading forced bold
+  blockMath: string | null; // block math expression ($$...$$)
 }
 
 function parseMarkdownLines(source: string): ParsedLine[] {
   const lines = source.split("\n");
   const parsed: ParsedLine[] = [];
+  let mathBuf: string[] | null = null;
 
   for (const line of lines) {
     const t = line.trim();
-    if (t === "") continue;
 
-    // Skip math blocks ($$...$$) — those would need rasterization
-    if (t.startsWith("$$")) continue;
-    // Skip inline math markers
-    if (t === "$$") continue;
+    // Block math delimiter $$
+    if (t === "$$") {
+      if (mathBuf === null) {
+        mathBuf = [];
+      } else {
+        parsed.push({
+          runs: [],
+          indent: 0,
+          bullet: false,
+          fontScale: 1,
+          isBold: false,
+          blockMath: mathBuf.join("\n"),
+        });
+        mathBuf = null;
+      }
+      continue;
+    }
+
+    // Inside block math
+    if (mathBuf !== null) {
+      mathBuf.push(line);
+      continue;
+    }
+
+    // Single-line block math $$...$$
+    const slm = t.match(/^\$\$(.+)\$\$$/);
+    if (slm) {
+      parsed.push({
+        runs: [],
+        indent: 0,
+        bullet: false,
+        fontScale: 1,
+        isBold: false,
+        blockMath: slm[1]!,
+      });
+      continue;
+    }
+
+    if (t === "") continue;
 
     // Heading
     const hm = t.match(/^(#{1,3})\s+(.+)$/);
@@ -156,6 +200,7 @@ function parseMarkdownLines(source: string): ParsedLine[] {
         bullet: false,
         fontScale: scale,
         isBold: true,
+        blockMath: null,
       });
       continue;
     }
@@ -168,6 +213,7 @@ function parseMarkdownLines(source: string): ParsedLine[] {
         bullet: true,
         fontScale: 1,
         isBold: false,
+        blockMath: null,
       });
       continue;
     }
@@ -179,60 +225,115 @@ function parseMarkdownLines(source: string): ParsedLine[] {
       bullet: false,
       fontScale: 1,
       isBold: false,
+      blockMath: null,
     });
   }
 
   return parsed;
 }
 
-function drawText(
-  doc: jsPDF,
-  el: TextElement,
-  deck: Deck,
-): void {
-  const s = resolveStyle<TextStyle>(deck.theme?.text, el.style);
-  const fontFamily = s.fontFamily ?? DEFAULT_TEXT_FONT;
-  const baseFontSize = s.fontSize ?? DEFAULT_TEXT_SIZE;
-  const color = s.color ?? DEFAULT_TEXT_COLOR;
-  const align = s.textAlign ?? "left";
-  const lineHeight = s.lineHeight ?? DEFAULT_LINE_HEIGHT;
-  const verticalAlign = s.verticalAlign ?? "top";
-  const pdfFont = mapFont(fontFamily);
+// ---- Rasterize HTML to PNG data URL via offscreen DOM + canvas ----
 
-  const { x, y } = el.position;
-  const { w, h } = el.size;
-  const padding = 4;
-  const maxWidth = w - padding * 2;
+async function rasterizeHtmlToImage(
+  html: string,
+  maxWidth: number,
+  color: string,
+): Promise<{ dataUrl: string; width: number; height: number } | null> {
+  const wrapper = document.createElement("div");
+  wrapper.style.cssText =
+    "position:fixed;left:0;top:0;z-index:-2147483647;pointer-events:none";
 
-  const parsedLines = parseMarkdownLines(el.content);
+  const container = document.createElement("div");
+  container.style.cssText = `display:inline-block;max-width:${maxWidth}px;color:${color};font-size:16px`;
+  container.innerHTML = html;
+  wrapper.appendChild(container);
+  document.body.appendChild(wrapper);
 
-  // Word-wrap each parsed line into visual lines
-  interface VisualLine {
-    segments: Array<{
-      text: string;
-      font: string;
-      style: string;
-      size: number;
-    }>;
-    indent: number;
-    bullet: boolean;
+  // Wait for KaTeX fonts to load
+  await document.fonts.ready;
+  await new Promise((r) => setTimeout(r, 50));
+
+  const rect = container.getBoundingClientRect();
+  const w = Math.ceil(rect.width);
+  const h = Math.ceil(rect.height);
+
+  if (w === 0 || h === 0) {
+    wrapper.remove();
+    return null;
   }
 
+  const { toPng } = await import("html-to-image");
+  const dataUrl = await toPng(container, {
+    width: w,
+    height: h,
+    pixelRatio: RASTER_SCALE,
+    skipFonts: false,
+  });
+
+  wrapper.remove();
+  return { dataUrl, width: w, height: h };
+}
+
+// ---- Layout and render text at a given font scale (returns total height) ----
+
+interface VisualLine {
+  segments: Array<{
+    text: string;
+    font: string;
+    style: string;
+    size: number;
+    mathRun?: TextRun; // if this segment is an inline math placeholder
+  }>;
+  indent: number;
+  bullet: boolean;
+  blockMath: string | null; // block-level math expression
+}
+
+function layoutText(
+  doc: jsPDF,
+  parsedLines: ParsedLine[],
+  baseFontSize: number,
+  pdfFont: string,
+  maxWidth: number,
+): VisualLine[] {
   const visualLines: VisualLine[] = [];
 
   for (const pl of parsedLines) {
+    // Block math — rendered as a separate visual line
+    if (pl.blockMath !== null) {
+      visualLines.push({
+        segments: [],
+        indent: 0,
+        bullet: false,
+        blockMath: pl.blockMath,
+      });
+      continue;
+    }
+
     const fontSize = baseFontSize * pl.fontScale;
     const availWidth = maxWidth - pl.indent;
 
-    // Build word-level segments
     const words: Array<{
       text: string;
       font: string;
       style: string;
       size: number;
+      mathRun?: TextRun;
     }> = [];
 
     for (const run of pl.runs) {
+      // Inline math — treated as a single "word" with placeholder width
+      if (run.math) {
+        words.push({
+          text: `$${run.text}$`,
+          font: pdfFont,
+          style: "normal",
+          size: fontSize,
+          mathRun: run,
+        });
+        continue;
+      }
+
       let style = "normal";
       let font = pdfFont;
       if (pl.isBold || run.bold) style = "bold";
@@ -246,11 +347,11 @@ function drawText(
       }
     }
 
-    // Wrap words into visual lines
     let currentLine: VisualLine = {
       segments: [],
       indent: pl.indent,
       bullet: pl.bullet,
+      blockMath: null,
     };
     let currentWidth = 0;
 
@@ -265,9 +366,9 @@ function drawText(
           segments: [],
           indent: pl.indent,
           bullet: false,
+          blockMath: null,
         };
         currentWidth = 0;
-        // Skip leading whitespace on wrapped lines
         if (w.text.trim().length === 0) continue;
       }
 
@@ -280,9 +381,79 @@ function drawText(
     }
   }
 
-  // Compute total text height for vertical alignment
+  return visualLines;
+}
+
+function computeTextHeight(
+  visualLines: VisualLine[],
+  baseFontSize: number,
+  lineHeight: number,
+): number {
   const lineHeightPx = baseFontSize * lineHeight;
-  const totalHeight = visualLines.length * lineHeightPx;
+  let height = 0;
+  for (const vl of visualLines) {
+    if (vl.blockMath !== null) {
+      // Estimate block math height (will be replaced by actual image height at render time)
+      height += baseFontSize * 2.5;
+    } else {
+      height += lineHeightPx;
+    }
+  }
+  return height;
+}
+
+async function drawText(
+  doc: jsPDF,
+  el: TextElement,
+  deck: Deck,
+): Promise<void> {
+  const s = resolveStyle<TextStyle>(deck.theme?.text, el.style);
+  const fontFamily = s.fontFamily ?? DEFAULT_TEXT_FONT;
+  const configuredFontSize = s.fontSize ?? DEFAULT_TEXT_SIZE;
+  const color = s.color ?? DEFAULT_TEXT_COLOR;
+  const align = s.textAlign ?? "left";
+  const lineHeight = s.lineHeight ?? DEFAULT_LINE_HEIGHT;
+  const verticalAlign = s.verticalAlign ?? "top";
+  const sizing = s.textSizing ?? "flexible";
+  const pdfFont = mapFont(fontFamily);
+
+  const { x, y } = el.position;
+  const { w, h } = el.size;
+  const padding = 4;
+  const maxWidth = w - padding * 2;
+
+  const parsedLines = parseMarkdownLines(el.content);
+
+  // Determine effective font size (flexible sizing = shrink to fit)
+  let baseFontSize = configuredFontSize;
+  if (sizing === "flexible") {
+    const testLines = layoutText(doc, parsedLines, baseFontSize, pdfFont, maxWidth);
+    const totalH = computeTextHeight(testLines, baseFontSize, lineHeight);
+    const availH = h - padding * 2;
+
+    if (totalH > availH) {
+      // Binary search for the largest font size that fits
+      let lo = MIN_FONT_SIZE;
+      let hi = baseFontSize;
+      while (hi - lo > 0.5) {
+        const mid = (lo + hi) / 2;
+        const midLines = layoutText(doc, parsedLines, mid, pdfFont, maxWidth);
+        const midH = computeTextHeight(midLines, mid, lineHeight);
+        if (midH <= availH) {
+          lo = mid;
+        } else {
+          hi = mid;
+        }
+      }
+      baseFontSize = Math.floor(lo);
+    }
+  }
+
+  const visualLines = layoutText(doc, parsedLines, baseFontSize, pdfFont, maxWidth);
+  const lineHeightPx = baseFontSize * lineHeight;
+
+  // Compute total height (accounting for block math)
+  const totalHeight = computeTextHeight(visualLines, baseFontSize, lineHeight);
   let startY: number;
   if (verticalAlign === "middle") {
     startY = y + (h - totalHeight) / 2 + baseFontSize;
@@ -292,16 +463,42 @@ function drawText(
     startY = y + padding + baseFontSize;
   }
 
-  // Render each visual line
-  for (let i = 0; i < visualLines.length; i++) {
-    const vl = visualLines[i]!;
-    const lineY = startY + i * lineHeightPx;
+  let currentY = startY;
 
-    if (lineY > y + h) break; // clip
+  for (const vl of visualLines) {
+    if (currentY > y + h) break;
+
+    // Block math — render via KaTeX HTML → rasterize → embed as image
+    if (vl.blockMath !== null) {
+      const mathHtml = katex.renderToString(vl.blockMath, {
+        displayMode: true,
+        throwOnError: false,
+      });
+      const img = await rasterizeHtmlToImage(mathHtml, maxWidth, color);
+      if (img) {
+        // Scale to fit in the available width
+        let imgW = img.width;
+        let imgH = img.height;
+        if (imgW > maxWidth) {
+          const scale = maxWidth / imgW;
+          imgW *= scale;
+          imgH *= scale;
+        }
+        // Center block math
+        const imgX = x + padding + (maxWidth - imgW) / 2;
+        const imgY = currentY - baseFontSize; // offset since currentY is baseline
+        doc.addImage(img.dataUrl, "PNG", imgX, imgY, imgW, imgH);
+        currentY += imgH + baseFontSize * 0.5;
+      } else {
+        currentY += lineHeightPx;
+      }
+      continue;
+    }
+
+    const lineY = currentY;
 
     let lineX: number;
     if (align === "center") {
-      // Compute total line width for centering
       let totalW = vl.indent;
       for (const seg of vl.segments) {
         doc.setFont(seg.font, seg.style);
@@ -331,12 +528,37 @@ function drawText(
 
     // Draw segments
     for (const seg of vl.segments) {
+      // Inline math — rasterize and embed as image
+      if (seg.mathRun) {
+        const mathHtml = katex.renderToString(seg.mathRun.text, {
+          displayMode: false,
+          throwOnError: false,
+        });
+        const img = await rasterizeHtmlToImage(mathHtml, maxWidth, color);
+        if (img) {
+          let imgW = img.width;
+          let imgH = img.height;
+          // Scale inline math to match font size
+          const targetH = baseFontSize * 1.2;
+          if (imgH > targetH) {
+            const scale = targetH / imgH;
+            imgW *= scale;
+            imgH *= scale;
+          }
+          doc.addImage(img.dataUrl, "PNG", lineX, lineY - imgH * 0.75, imgW, imgH);
+          lineX += imgW + 2;
+        }
+        continue;
+      }
+
       doc.setFont(seg.font, seg.style);
       doc.setFontSize(seg.size);
       setTextColor(doc, color);
       doc.text(seg.text, lineX, lineY);
       lineX += doc.getTextWidth(seg.text);
     }
+
+    currentY += lineHeightPx;
   }
 }
 
@@ -598,8 +820,56 @@ function drawTable(doc: jsPDF, el: TableElement, deck: Deck): void {
 }
 
 // ========================================================================
-// TikZ → PDF via svg2pdf.js (vector quality)
+// TikZ → PDF via rasterization
+//
+// TikZ SVGs use custom fonts from tikzjax WASM output that svg2pdf.js
+// cannot map, causing garbled text (ð characters). Rasterize to PNG
+// instead, same as the image-based export path.
 // ========================================================================
+
+async function rasterizeSvg(
+  url: string,
+  w: number,
+  h: number,
+): Promise<string | null> {
+  const resp = await fetch(url);
+  if (!resp.ok) return null;
+  const svgText = await resp.text();
+  const blob = new Blob([svgText], {
+    type: "image/svg+xml;charset=utf-8",
+  });
+  const blobUrl = URL.createObjectURL(blob);
+  const img = new Image();
+  const loaded = await new Promise<boolean>((resolve) => {
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = blobUrl;
+  });
+  if (!loaded) {
+    URL.revokeObjectURL(blobUrl);
+    return null;
+  }
+  // Preserve aspect ratio
+  const nw = img.naturalWidth || w;
+  const nh = img.naturalHeight || h;
+  let rw: number, rh: number;
+  if (nw / nh > w / h) {
+    rw = w;
+    rh = w * (nh / nw);
+  } else {
+    rh = h;
+    rw = h * (nw / nh);
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(rw * RASTER_SCALE);
+  canvas.height = Math.round(rh * RASTER_SCALE);
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(RASTER_SCALE, RASTER_SCALE);
+  ctx.drawImage(img, 0, 0, rw, rh);
+  URL.revokeObjectURL(blobUrl);
+  return canvas.toDataURL("image/png");
+}
 
 async function drawTikZ(
   doc: jsPDF,
@@ -613,17 +883,10 @@ async function drawTikZ(
   const { x, y } = el.position;
   const { w, h } = el.size;
 
-  // Fetch SVG text and parse into DOM element
-  const resp = await fetch(resolved);
-  if (!resp.ok) return;
-  const svgText = await resp.text();
-
-  const parser = new DOMParser();
-  const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
-  const svgElement = svgDoc.documentElement;
-
-  // Use svg2pdf.js to render SVG as vector paths in the PDF
-  await doc.svg(svgElement, { x, y, width: w, height: h });
+  const rasterized = await rasterizeSvg(resolved, w, h);
+  if (rasterized) {
+    doc.addImage(rasterized, "PNG", x, y, w, h);
+  }
 }
 
 // ========================================================================
@@ -667,7 +930,7 @@ async function renderSlide(
   for (const el of slide.elements) {
     switch (el.type) {
       case "text":
-        drawText(doc, el, deck);
+        await drawText(doc, el, deck);
         break;
       case "code":
         await drawCode(doc, el, deck);
