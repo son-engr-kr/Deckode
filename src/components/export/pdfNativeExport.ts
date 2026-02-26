@@ -194,22 +194,24 @@ function parseMarkdownLines(source: string): ParsedLine[] {
     if (hm) {
       const level = hm[1]!.length as 1 | 2 | 3;
       const scale = { 1: 1.8, 2: 1.4, 3: 1.1 }[level];
+      // h1=bold, h2=semibold(→bold in jsPDF), h3=medium(→normal in jsPDF)
+      const bold = level <= 2;
       parsed.push({
         runs: parseInlineMarkdown(hm[2]!),
         indent: 0,
         bullet: false,
         fontScale: scale,
-        isBold: true,
+        isBold: bold,
         blockMath: null,
       });
       continue;
     }
 
-    // List item
+    // List item (indent is computed at layout time as 1.5em, matching CSS)
     if (t.startsWith("- ") || t.startsWith("* ")) {
       parsed.push({
         runs: parseInlineMarkdown(t.slice(2)),
-        indent: 20,
+        indent: -1, // sentinel: computed as 1.5 * fontSize at layout time
         bullet: true,
         fontScale: 1,
         isBold: false,
@@ -311,7 +313,9 @@ function layoutText(
     }
 
     const fontSize = baseFontSize * pl.fontScale;
-    const availWidth = maxWidth - pl.indent;
+    // Resolve list indent: -1 sentinel → 1.5em (matching CSS padding-left)
+    const indent = pl.indent === -1 ? Math.round(fontSize * 1.5) : pl.indent;
+    const availWidth = maxWidth - indent;
 
     const words: Array<{
       text: string;
@@ -349,7 +353,7 @@ function layoutText(
 
     let currentLine: VisualLine = {
       segments: [],
-      indent: pl.indent,
+      indent,
       bullet: pl.bullet,
       blockMath: null,
     };
@@ -364,7 +368,7 @@ function layoutText(
         visualLines.push(currentLine);
         currentLine = {
           segments: [],
-          indent: pl.indent,
+          indent,
           bullet: false,
           blockMath: null,
         };
@@ -390,10 +394,17 @@ function computeTextHeight(
   lineHeight: number,
 ): number {
   const lineHeightPx = baseFontSize * lineHeight;
+  const listMargin = baseFontSize * 0.25; // matches CSS margin: 0.25em 0
   let height = 0;
+  let prevWasBullet = false;
   for (const vl of visualLines) {
+    // Add margin before first bullet in a group, and after last bullet
+    const isBullet = vl.bullet || (vl.indent > 0 && vl.blockMath === null);
+    if (isBullet && !prevWasBullet) height += listMargin;
+    if (!isBullet && prevWasBullet) height += listMargin;
+    prevWasBullet = isBullet;
+
     if (vl.blockMath !== null) {
-      // Estimate block math height (will be replaced by actual image height at render time)
       height += baseFontSize * 2.5;
     } else {
       height += lineHeightPx;
@@ -419,8 +430,9 @@ async function drawText(
 
   const { x, y } = el.position;
   const { w, h } = el.size;
-  const padding = 4;
-  const maxWidth = w - padding * 2;
+  // No padding — matches the React TextElement renderer which uses the full
+  // element bounding box with no internal spacing.
+  const maxWidth = w;
 
   const parsedLines = parseMarkdownLines(el.content);
 
@@ -429,7 +441,7 @@ async function drawText(
   if (sizing === "flexible") {
     const testLines = layoutText(doc, parsedLines, baseFontSize, pdfFont, maxWidth);
     const totalH = computeTextHeight(testLines, baseFontSize, lineHeight);
-    const availH = h - padding * 2;
+    const availH = h;
 
     if (totalH > availH) {
       // Binary search for the largest font size that fits
@@ -458,15 +470,23 @@ async function drawText(
   if (verticalAlign === "middle") {
     startY = y + (h - totalHeight) / 2 + baseFontSize;
   } else if (verticalAlign === "bottom") {
-    startY = y + h - totalHeight + baseFontSize - padding;
+    startY = y + h - totalHeight + baseFontSize;
   } else {
-    startY = y + padding + baseFontSize;
+    startY = y + baseFontSize;
   }
 
   let currentY = startY;
+  const listMargin = baseFontSize * 0.25;
+  let prevWasBullet = false;
 
   for (const vl of visualLines) {
     if (currentY > y + h) break;
+
+    // List margin spacing (matches CSS ul margin: 0.25em 0)
+    const isBullet = vl.bullet || (vl.indent > 0 && vl.blockMath === null);
+    if (isBullet && !prevWasBullet) currentY += listMargin;
+    if (!isBullet && prevWasBullet) currentY += listMargin;
+    prevWasBullet = isBullet;
 
     // Block math — render via KaTeX HTML → rasterize → embed as image
     if (vl.blockMath !== null) {
@@ -485,7 +505,7 @@ async function drawText(
           imgH *= scale;
         }
         // Center block math
-        const imgX = x + padding + (maxWidth - imgW) / 2;
+        const imgX = x + (maxWidth - imgW) / 2;
         const imgY = currentY - baseFontSize; // offset since currentY is baseline
         doc.addImage(img.dataUrl, "PNG", imgX, imgY, imgW, imgH);
         currentY += imgH + baseFontSize * 0.5;
@@ -505,7 +525,7 @@ async function drawText(
         doc.setFontSize(seg.size);
         totalW += doc.getTextWidth(seg.text);
       }
-      lineX = x + padding + (maxWidth - totalW) / 2 + vl.indent;
+      lineX = x + (maxWidth - totalW) / 2 + vl.indent;
     } else if (align === "right") {
       let totalW = 0;
       for (const seg of vl.segments) {
@@ -513,17 +533,18 @@ async function drawText(
         doc.setFontSize(seg.size);
         totalW += doc.getTextWidth(seg.text);
       }
-      lineX = x + w - padding - totalW;
+      lineX = x + w - totalW;
     } else {
-      lineX = x + padding + vl.indent;
+      lineX = x + vl.indent;
     }
 
-    // Draw bullet
+    // Draw bullet (positioned at start of indent area, matching CSS disc list-style)
     if (vl.bullet) {
       doc.setFont(pdfFont, "normal");
       doc.setFontSize(baseFontSize);
       setTextColor(doc, color);
-      doc.text("\u2022", lineX - 12, lineY);
+      const bulletOffset = baseFontSize * 0.75; // roughly center of 1.5em indent
+      doc.text("\u2022", lineX - bulletOffset, lineY);
     }
 
     // Draw segments
