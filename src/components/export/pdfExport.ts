@@ -21,6 +21,7 @@ import type {
 } from "@/types/deck";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/types/deck";
 import { fetchImageAsBase64 } from "@/utils/exportUtils";
+import { useDeckStore } from "@/stores/deckStore";
 
 // ---- Defaults (matching React renderers exactly) ----
 
@@ -47,6 +48,16 @@ function resolveStyle<T extends object>(
   if (!theme) return element ?? ({} as Partial<T>);
   if (!element) return theme;
   return { ...theme, ...element };
+}
+
+// ---- Asset URL resolution (mirrors ViteApiAdapter.resolveAssetUrl) ----
+
+function resolveAssetSrc(src: string): string {
+  if (src.startsWith("./assets/")) {
+    const project = useDeckStore.getState().currentProject;
+    if (project) return `/assets/${project}/${src.slice(9)}`;
+  }
+  return src;
 }
 
 // ---- HTML escape ----
@@ -412,9 +423,10 @@ async function buildImage(
     .filter(Boolean)
     .join(";");
 
-  // Pre-fetch as base64 to avoid CORS issues during capture
-  const b64 = await fetchImageAsBase64(el.src);
-  img.src = b64 ?? el.src;
+  // Resolve ./assets/ paths and pre-fetch as base64 to avoid CORS issues
+  const resolved = resolveAssetSrc(el.src);
+  const b64 = await fetchImageAsBase64(resolved);
+  img.src = b64 ?? resolved;
 
   d.appendChild(img);
   return d;
@@ -567,13 +579,57 @@ function buildTable(el: TableElement, deck: Deck): HTMLElement {
 
 async function buildTikZ(el: TikZElement): Promise<HTMLElement | null> {
   if (!el.svgUrl) return null;
+  const resolved = resolveAssetSrc(el.svgUrl);
+
+  // SVGs inside html-to-image's foreignObject are problematic (cross-origin,
+  // namespace issues). Rasterize the SVG to a PNG data URL via an offscreen
+  // canvas so the <img> in the slide DOM uses a self-contained bitmap.
+  const rasterized = await rasterizeSvg(resolved, el.size.w, el.size.h);
+
   const d = document.createElement("div");
   d.style.cssText = "width:100%;height:100%";
   const img = document.createElement("img");
   img.style.cssText = "width:100%;height:100%;object-fit:contain";
-  img.src = el.svgUrl;
+  img.src = rasterized ?? resolved;
   d.appendChild(img);
   return d;
+}
+
+async function rasterizeSvg(
+  url: string,
+  w: number,
+  h: number,
+): Promise<string | null> {
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const svgText = await resp.text();
+    const blob = new Blob([svgText], {
+      type: "image/svg+xml;charset=utf-8",
+    });
+    const blobUrl = URL.createObjectURL(blob);
+    const img = new Image();
+    const loaded = await new Promise<boolean>((resolve) => {
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+      img.src = blobUrl;
+    });
+    if (!loaded) {
+      URL.revokeObjectURL(blobUrl);
+      return null;
+    }
+    const scale = CAPTURE_SCALE;
+    const canvas = document.createElement("canvas");
+    canvas.width = w * scale;
+    canvas.height = h * scale;
+    const ctx = canvas.getContext("2d")!;
+    ctx.scale(scale, scale);
+    ctx.drawImage(img, 0, 0, w, h);
+    URL.revokeObjectURL(blobUrl);
+    return canvas.toDataURL("image/png");
+  } catch {
+    return null;
+  }
 }
 
 // ---- Video (placeholder) ----
