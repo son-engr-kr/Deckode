@@ -68,6 +68,55 @@ export function EditorCanvas() {
     return () => window.removeEventListener("resize", updateScale);
   }, [updateScale]);
 
+  // Clipboard paste: add image from Ctrl+V
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      if (!deck) return;
+
+      // Don't intercept paste in text inputs
+      const active = document.activeElement;
+      if (
+        active instanceof HTMLInputElement ||
+        active instanceof HTMLTextAreaElement ||
+        (active instanceof HTMLElement && active.isContentEditable)
+      ) {
+        return;
+      }
+
+      const file = Array.from(e.clipboardData?.files ?? []).find((f) =>
+        f.type.startsWith("image/"),
+      );
+      if (!file) return;
+
+      e.preventDefault();
+
+      // Clipboard files often have generic names like "image.png"
+      const ext = file.name.split(".").pop() || "png";
+      const renamed = new File([file], `paste-${Date.now()}.${ext}`, {
+        type: file.type,
+      });
+
+      const url = await adapter.uploadAsset(renamed);
+
+      const slide = deck.slides[currentSlideIndex];
+      assert(slide !== undefined, `Slide index ${currentSlideIndex} out of bounds`);
+
+      const id = crypto.randomUUID();
+      const element: ImageElement = {
+        id,
+        type: "image",
+        src: url,
+        position: { x: 330, y: 170 },
+        size: { w: 300, h: 200 },
+      };
+      addElement(slide.id, element);
+      selectElement(id);
+    };
+
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, [deck, currentSlideIndex, adapter, addElement, selectElement]);
+
   if (!deck) return null;
 
   const slide = deck.slides[currentSlideIndex];
