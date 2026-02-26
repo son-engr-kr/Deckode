@@ -1,7 +1,7 @@
 import { useRef, useState, useLayoutEffect } from "react";
 import type { TextElement as TextElementType, TextStyle } from "@/types/deck";
 import { renderMarkdown } from "@/utils/markdown";
-import { useTheme, resolveStyle } from "@/contexts/ThemeContext";
+import { useElementStyle } from "@/contexts/ThemeContext";
 
 const MIN_FONT_SIZE = 6;
 
@@ -10,8 +10,7 @@ interface Props {
 }
 
 export function TextElementRenderer({ element }: Props) {
-  const theme = useTheme();
-  const style = resolveStyle<TextStyle>(theme.text, element.style);
+  const style = useElementStyle<TextStyle>("text", element.style);
   const verticalAlign = style.verticalAlign ?? "top";
   const alignItems = { top: "flex-start", middle: "center", bottom: "flex-end" }[verticalAlign];
 

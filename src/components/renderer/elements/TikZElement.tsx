@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import type { TikZElement as TikZElementType, TikZStyle } from "@/types/deck";
-import { useTheme, resolveStyle } from "@/contexts/ThemeContext";
+import { useElementStyle } from "@/contexts/ThemeContext";
 import { useAssetUrl } from "@/contexts/AdapterContext";
 import { useDeckStore } from "@/stores/deckStore";
 
@@ -19,8 +19,7 @@ function isSvgFresh(element: TikZElementType): boolean {
 }
 
 export function TikZElementRenderer({ element, thumbnail }: Props) {
-  const deckTheme = useTheme();
-  const style = resolveStyle<TikZStyle>(deckTheme.tikz, element.style);
+  const style = useElementStyle<TikZStyle>("tikz", element.style);
   const resolvedSvgUrl = useAssetUrl(element.svgUrl);
   const [imgBroken, setImgBroken] = useState(false);
 

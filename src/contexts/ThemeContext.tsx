@@ -1,4 +1,4 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext, useMemo } from "react";
 import type { DeckTheme } from "@/types/deck";
 
 const ThemeContext = createContext<DeckTheme>({});
@@ -30,4 +30,17 @@ export function resolveStyle<T>(
   if (!themeStyle) return elementStyle ?? {};
   if (!elementStyle) return themeStyle;
   return { ...themeStyle, ...elementStyle };
+}
+
+/**
+ * Hook: resolve element style from theme + per-element overrides.
+ * Replaces the repeated `useTheme()` + `resolveStyle()` pattern.
+ */
+export function useElementStyle<T>(
+  themeKey: keyof DeckTheme,
+  elementStyle: Partial<T> | undefined,
+): Partial<T> {
+  const theme = useTheme();
+  const themeStyle = theme[themeKey] as Partial<T> | undefined;
+  return useMemo(() => resolveStyle(themeStyle, elementStyle), [themeStyle, elementStyle]);
 }

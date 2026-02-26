@@ -1,15 +1,14 @@
 import { useEffect, useState } from "react";
 import type { CodeElement as CodeElementType, CodeStyle } from "@/types/deck";
 import { codeToHtml } from "shiki";
-import { useTheme, resolveStyle } from "@/contexts/ThemeContext";
+import { useElementStyle } from "@/contexts/ThemeContext";
 
 interface Props {
   element: CodeElementType;
 }
 
 export function CodeElementRenderer({ element }: Props) {
-  const deckTheme = useTheme();
-  const style = resolveStyle<CodeStyle>(deckTheme.code, element.style);
+  const style = useElementStyle<CodeStyle>("code", element.style);
   const theme = style.theme ?? "github-dark";
   const [html, setHtml] = useState<string | null>(null);
 

@@ -1,13 +1,12 @@
 import type { TableElement as TableElementType, TableStyle } from "@/types/deck";
-import { useTheme, resolveStyle } from "@/contexts/ThemeContext";
+import { useElementStyle } from "@/contexts/ThemeContext";
 
 interface Props {
   element: TableElementType;
 }
 
 export function TableElementRenderer({ element }: Props) {
-  const theme = useTheme();
-  const style = resolveStyle<TableStyle>(theme.table, element.style);
+  const style = useElementStyle<TableStyle>("table", element.style);
 
   const fontSize = style.fontSize ?? 14;
   const color = style.color ?? "#e2e8f0";
