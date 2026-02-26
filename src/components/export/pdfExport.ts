@@ -618,13 +618,26 @@ async function rasterizeSvg(
       URL.revokeObjectURL(blobUrl);
       return null;
     }
+    // Preserve the SVG's natural aspect ratio (object-fit: contain).
+    // Without this, drawImage stretches the SVG to fill the element box.
+    const nw = img.naturalWidth || w;
+    const nh = img.naturalHeight || h;
+    let rw: number, rh: number;
+    if (nw / nh > w / h) {
+      rw = w;
+      rh = w * (nh / nw);
+    } else {
+      rh = h;
+      rw = h * (nw / nh);
+    }
+
     const scale = CAPTURE_SCALE;
     const canvas = document.createElement("canvas");
-    canvas.width = w * scale;
-    canvas.height = h * scale;
+    canvas.width = Math.round(rw * scale);
+    canvas.height = Math.round(rh * scale);
     const ctx = canvas.getContext("2d")!;
     ctx.scale(scale, scale);
-    ctx.drawImage(img, 0, 0, w, h);
+    ctx.drawImage(img, 0, 0, rw, rh);
     URL.revokeObjectURL(blobUrl);
     return canvas.toDataURL("image/png");
   } catch {
