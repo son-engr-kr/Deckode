@@ -11,13 +11,14 @@
  *   test-results/pdf-compare/
  *     image-page-1.png, native-page-1.png, diff-page-1.png
  *     comparison-report.json  (per-page RMSE scores)
- *
- * The diff images highlight pixel differences. Lower RMSE = more similar.
- * Use these outputs to iteratively improve native PDF fidelity.
  */
 import { test, expect } from "@playwright/test";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const COMPARE_DIR = path.resolve(
   __dirname,
@@ -28,57 +29,65 @@ test("render and compare both PDF exports side by side", async ({ page }) => {
   test.setTimeout(120_000);
   fs.mkdirSync(COMPARE_DIR, { recursive: true });
 
-  // Navigate and wait for app
+  // Navigate and wait for app (project selector)
   await page.goto("/");
   await page.waitForSelector(".h-screen", { timeout: 15_000 });
 
-  // Check if there's a project loaded (PDF button visible)
-  const pdfButton = page.locator("button", { hasText: /PDF/ });
-  const hasPdf = (await pdfButton.count()) > 0;
-  if (!hasPdf) {
-    console.log("No project loaded — open a project first, then run this test");
-    test.skip();
-    return;
+  // Click on a project to open it — look for "deckode-intro" or any project button
+  const projectButton = page.locator("button", {
+    hasText: /deckode-intro|example|muscle/,
+  });
+  const projectCount = await projectButton.count();
+  if (projectCount > 0) {
+    await projectButton.first().click();
+    await page.waitForTimeout(2000);
   }
+
+  // Wait for the editor to load (PDF button should appear)
+  const pdfButton = page.locator("button", { hasText: /PDF/ });
+  await pdfButton.first().waitFor({ state: "visible", timeout: 15_000 });
 
   // Collect downloaded PDFs
   const pdfFiles: Record<string, string> = {};
-  page.on("download", async (download) => {
-    const name = download.suggestedFilename();
-    const savePath = path.join(COMPARE_DIR, name);
-    await download.saveAs(savePath);
-    const key = name.includes("native") ? "native" : "image";
-    pdfFiles[key] = savePath;
-  });
 
   // Export Image PDF
   await pdfButton.first().click();
   await page.waitForTimeout(300);
   const imageBtn = page.locator("button", { hasText: "PDF (Image)" });
-  if (await imageBtn.isVisible({ timeout: 2000 })) {
-    await imageBtn.click();
-    // Wait for export to complete (image-based is slower)
-    await page.waitForEvent("download", { timeout: 30_000 });
-    await page.waitForTimeout(1000);
-  }
+  await imageBtn.waitFor({ state: "visible", timeout: 3000 });
+
+  const [imageDownload] = await Promise.all([
+    page.waitForEvent("download", { timeout: 60_000 }),
+    imageBtn.click(),
+  ]);
+  const imagePath = path.join(COMPARE_DIR, imageDownload.suggestedFilename());
+  await imageDownload.saveAs(imagePath);
+  pdfFiles["image"] = imagePath;
+  console.log(`Image PDF saved: ${imageDownload.suggestedFilename()}`);
+
+  // Wait a bit between exports
+  await page.waitForTimeout(2000);
 
   // Export Native PDF
   await pdfButton.first().click();
   await page.waitForTimeout(300);
   const nativeBtn = page.locator("button", { hasText: "PDF (Native)" });
-  if (await nativeBtn.isVisible({ timeout: 2000 })) {
-    await nativeBtn.click();
-    await page.waitForEvent("download", { timeout: 30_000 });
-    await page.waitForTimeout(1000);
-  }
+  await nativeBtn.waitFor({ state: "visible", timeout: 3000 });
 
-  expect(pdfFiles["image"]).toBeTruthy();
-  expect(pdfFiles["native"]).toBeTruthy();
+  const [nativeDownload] = await Promise.all([
+    page.waitForEvent("download", { timeout: 60_000 }),
+    nativeBtn.click(),
+  ]);
+  const nativePath = path.join(
+    COMPARE_DIR,
+    nativeDownload.suggestedFilename(),
+  );
+  await nativeDownload.saveAs(nativePath);
+  pdfFiles["native"] = nativePath;
+  console.log(`Native PDF saved: ${nativeDownload.suggestedFilename()}`);
 
-  // Render PDF pages to PNG arrays in the browser via pdfjs-dist
-  async function renderPdfToImages(
-    pdfPath: string,
-  ): Promise<string[]> {
+  // Render PDF pages to PNG arrays in the browser via pdfjs-dist CDN
+  async function renderPdfToImages(pdfPath: string): Promise<string[]> {
     const bytes = fs.readFileSync(pdfPath);
     const b64 = bytes.toString("base64");
 
@@ -110,8 +119,13 @@ test("render and compare both PDF exports side by side", async ({ page }) => {
     }, b64);
   }
 
+  console.log("Rendering Image PDF pages...");
   const imagePages = await renderPdfToImages(pdfFiles["image"]!);
+  console.log(`  ${imagePages.length} pages rendered`);
+
+  console.log("Rendering Native PDF pages...");
   const nativePages = await renderPdfToImages(pdfFiles["native"]!);
+  console.log(`  ${nativePages.length} pages rendered`);
 
   expect(imagePages.length).toBe(nativePages.length);
 
@@ -122,6 +136,7 @@ test("render and compare both PDF exports side by side", async ({ page }) => {
     nativeFile: string;
     diffFile: string;
     rmse: number;
+    diffPercent: number;
   }> = [];
 
   for (let i = 0; i < imagePages.length; i++) {
@@ -179,6 +194,7 @@ test("render and compare both PDF exports side by side", async ({ page }) => {
         const diffData = ctxD.createImageData(w, h);
 
         let sumSq = 0;
+        let diffPixels = 0;
         const n = w * h;
         for (let p = 0; p < n; p++) {
           const idx = p * 4;
@@ -188,8 +204,8 @@ test("render and compare both PDF exports side by side", async ({ page }) => {
           const dist = Math.sqrt(dr * dr + dg * dg + db * db);
           sumSq += dist * dist;
 
-          // Diff visualization: red = different, gray = same
           if (dist > 10) {
+            diffPixels++;
             const intensity = Math.min(255, dist * 2);
             diffData.data[idx] = intensity;
             diffData.data[idx + 1] = 0;
@@ -197,7 +213,7 @@ test("render and compare both PDF exports side by side", async ({ page }) => {
             diffData.data[idx + 3] = 255;
           } else {
             const avg = Math.round(
-              (dataA.data[idx]! + dataB.data[idx]!) / 2 * 0.3,
+              ((dataA.data[idx]! + dataB.data[idx]!) / 2) * 0.3,
             );
             diffData.data[idx] = avg;
             diffData.data[idx + 1] = avg;
@@ -211,6 +227,7 @@ test("render and compare both PDF exports side by side", async ({ page }) => {
 
         return {
           rmse: Math.round(rmse * 100) / 100,
+          diffPercent: Math.round((diffPixels / n) * 10000) / 100,
           diffDataUrl: diffCanvas.toDataURL("image/png"),
         };
       },
@@ -233,9 +250,12 @@ test("render and compare both PDF exports side by side", async ({ page }) => {
       nativeFile: natFile,
       diffFile,
       rmse: diffResult.rmse,
+      diffPercent: diffResult.diffPercent,
     });
 
-    console.log(`Page ${i + 1}: RMSE = ${diffResult.rmse}`);
+    console.log(
+      `Page ${i + 1}: RMSE = ${diffResult.rmse}, diff pixels = ${diffResult.diffPercent}%`,
+    );
   }
 
   // Save report
@@ -244,7 +264,5 @@ test("render and compare both PDF exports side by side", async ({ page }) => {
     JSON.stringify(report, null, 2),
   );
 
-  console.log(`\nComparison results saved to: ${COMPARE_DIR}`);
-  console.log("Files: image-page-N.png, native-page-N.png, diff-page-N.png");
-  console.log("Red areas in diff images show visual differences");
+  console.log(`\nComparison saved to: ${COMPARE_DIR}`);
 });

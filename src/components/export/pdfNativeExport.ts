@@ -40,6 +40,15 @@ import {
 const MIN_FONT_SIZE = 6;
 const RASTER_SCALE = 2;
 
+// Regex to detect characters that jsPDF's standard 14 fonts cannot render:
+// CJK Unified Ideographs, Hangul, Hiragana, Katakana, CJK symbols, etc.
+const NON_LATIN_RE =
+  /[\u1100-\u11FF\u3000-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF\uFF00-\uFFEF]/;
+
+function containsNonLatin(text: string): boolean {
+  return NON_LATIN_RE.test(text);
+}
+
 // ---- Font mapping: custom fonts → jsPDF 14 standard fonts ----
 
 function mapFont(fontFamily: string): string {
@@ -234,6 +243,144 @@ function parseMarkdownLines(source: string): ParsedLine[] {
   return parsed;
 }
 
+// ---- Rasterize entire text element for CJK / non-Latin content ----
+// Mirrors pdfExport.ts buildText + mdToHtml pipeline: renders the text as
+// an offscreen DOM element, captures it with html-to-image, embeds as PNG.
+
+async function drawTextAsRaster(
+  doc: jsPDF,
+  el: TextElement,
+  deck: Deck,
+): Promise<void> {
+  const s = resolveStyle<TextStyle>(deck.theme?.text, el.style);
+  const font = s.fontFamily ?? DEFAULT_TEXT_FONT;
+  const size = s.fontSize ?? DEFAULT_TEXT_SIZE;
+  const color = s.color ?? DEFAULT_TEXT_COLOR;
+  const alignCss = s.textAlign ?? "left";
+  const lh = s.lineHeight ?? DEFAULT_LINE_HEIGHT;
+  const va = s.verticalAlign ?? "top";
+  const sizing = s.textSizing ?? "flexible";
+  const ai = { top: "flex-start", middle: "center", bottom: "flex-end" }[va];
+
+  const { x, y } = el.position;
+  const { w, h } = el.size;
+
+  // Build the same DOM structure as pdfExport.ts buildText
+  const wrapper = document.createElement("div");
+  wrapper.style.cssText =
+    "position:fixed;left:0;top:0;z-index:-2147483647;pointer-events:none";
+
+  const outer = document.createElement("div");
+  outer.style.cssText = `display:flex;align-items:${ai};font-family:${font};font-size:${size}px;color:${color};text-align:${alignCss};line-height:${lh};width:${w}px;height:${h}px;overflow:hidden`;
+
+  const inner = document.createElement("div");
+  inner.style.width = "100%";
+
+  // Use the same mdToHtml pipeline as pdfExport.ts (inline import to avoid
+  // duplicating the function — we call katex.renderToString for math)
+  const mdHtml = rasterMdToHtml(el.content, color);
+  inner.innerHTML = mdHtml;
+  outer.appendChild(inner);
+  wrapper.appendChild(outer);
+  document.body.appendChild(wrapper);
+
+  // Flexible text sizing: binary-search font shrink (mirrors fitFont in pdfExport.ts)
+  if (sizing === "flexible") {
+    outer.style.fontSize = `${size}px`;
+    if (inner.scrollHeight > outer.clientHeight + 1) {
+      let lo = MIN_FONT_SIZE;
+      let hi = size;
+      while (hi - lo > 0.5) {
+        const mid = (lo + hi) / 2;
+        outer.style.fontSize = `${mid}px`;
+        if (inner.scrollHeight <= outer.clientHeight + 1) lo = mid;
+        else hi = mid;
+      }
+      outer.style.fontSize = `${Math.floor(lo)}px`;
+    }
+  }
+
+  // Wait for fonts
+  await document.fonts.ready;
+
+  const { toPng } = await import("html-to-image");
+  const dataUrl = await toPng(outer, {
+    width: w,
+    height: h,
+    pixelRatio: RASTER_SCALE,
+  });
+  wrapper.remove();
+
+  doc.addImage(dataUrl, "PNG", x, y, w, h);
+}
+
+// Simplified markdown → HTML for rasterization (same as pdfExport.ts mdToHtml)
+function rasterMdToHtml(source: string, _color: string): string {
+  const lines = source.split("\n");
+  const out: string[] = [];
+  let listItems: string[] = [];
+  let mathBuf: string[] | null = null;
+
+  const flushList = () => {
+    if (!listItems.length) return;
+    out.push(
+      `<ul style="list-style-type:disc;padding-left:1.5em;margin:0.25em 0">${listItems.map((li) => `<li>${rasterInlineHtml(li)}</li>`).join("")}</ul>`,
+    );
+    listItems = [];
+  };
+
+  for (const line of lines) {
+    const t = line.trim();
+    if (t === "$$") {
+      if (mathBuf === null) { flushList(); mathBuf = []; }
+      else {
+        out.push(`<div style="margin:0.5em 0;text-align:center">${katex.renderToString(mathBuf.join("\n"), { displayMode: true, throwOnError: false })}</div>`);
+        mathBuf = null;
+      }
+      continue;
+    }
+    if (mathBuf !== null) { mathBuf.push(line); continue; }
+    const slm = t.match(/^\$\$(.+)\$\$$/);
+    if (slm) {
+      flushList();
+      out.push(`<div style="margin:0.5em 0;text-align:center">${katex.renderToString(slm[1]!, { displayMode: true, throwOnError: false })}</div>`);
+      continue;
+    }
+    if (t.startsWith("- ") || t.startsWith("* ")) { listItems.push(t.slice(2)); continue; }
+    flushList();
+    if (t === "") continue;
+    const hm = t.match(/^(#{1,3})\s+(.+)$/);
+    if (hm) {
+      const level = hm[1]!.length as 1 | 2 | 3;
+      const sz = { 1: "1.8em", 2: "1.4em", 3: "1.1em" }[level];
+      const fw = { 1: "bold", 2: "600", 3: "500" }[level];
+      out.push(`<div style="font-size:${sz};font-weight:${fw}">${rasterInlineHtml(hm[2]!)}</div>`);
+      continue;
+    }
+    out.push(`<p style="margin:0">${rasterInlineHtml(t)}</p>`);
+  }
+  flushList();
+  return out.join("");
+}
+
+function rasterInlineHtml(text: string): string {
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const re = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)|(\$(.+?)\$)/g;
+  let r = "";
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) r += esc(text.slice(last, m.index));
+    if (m[2] !== undefined) r += `<strong>${esc(m[2])}</strong>`;
+    else if (m[4] !== undefined) r += `<em>${esc(m[4])}</em>`;
+    else if (m[6] !== undefined) r += `<code style="background:rgba(255,255,255,0.1);padding:0 0.375em;border-radius:0.25em;font-size:0.85em;font-family:monospace">${esc(m[6])}</code>`;
+    else if (m[8] !== undefined) r += katex.renderToString(m[8], { displayMode: false, throwOnError: false });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) r += esc(text.slice(last));
+  return r;
+}
+
 // ---- Rasterize HTML to PNG data URL via offscreen DOM + canvas ----
 
 async function rasterizeHtmlToImage(
@@ -393,7 +540,6 @@ function computeTextHeight(
   baseFontSize: number,
   lineHeight: number,
 ): number {
-  const lineHeightPx = baseFontSize * lineHeight;
   const listMargin = baseFontSize * 0.25; // matches CSS margin: 0.25em 0
   let height = 0;
   let prevWasBullet = false;
@@ -407,7 +553,13 @@ function computeTextHeight(
     if (vl.blockMath !== null) {
       height += baseFontSize * 2.5;
     } else {
-      height += lineHeightPx;
+      // Use the largest segment fontSize to compute line height.
+      // Headings have fontScale > 1, so their lines are taller.
+      const maxSegSize =
+        vl.segments.length > 0
+          ? Math.max(...vl.segments.map((s) => s.size))
+          : baseFontSize;
+      height += maxSegSize * lineHeight;
     }
   }
   return height;
@@ -430,6 +582,14 @@ async function drawText(
 
   const { x, y } = el.position;
   const { w, h } = el.size;
+
+  // jsPDF's standard 14 fonts don't support CJK characters (Korean, Chinese,
+  // Japanese). When text contains these characters, rasterize the entire
+  // element using the same HTML→PNG pipeline as the image-based export.
+  if (containsNonLatin(el.content)) {
+    await drawTextAsRaster(doc, el, deck);
+    return;
+  }
   // No padding — matches the React TextElement renderer which uses the full
   // element bounding box with no internal spacing.
   const maxWidth = w;
@@ -462,17 +622,21 @@ async function drawText(
   }
 
   const visualLines = layoutText(doc, parsedLines, baseFontSize, pdfFont, maxWidth);
-  const lineHeightPx = baseFontSize * lineHeight;
 
   // Compute total height (accounting for block math)
   const totalHeight = computeTextHeight(visualLines, baseFontSize, lineHeight);
+  // First line baseline offset: use the first line's actual font size (headings are larger)
+  const firstLineSize =
+    visualLines.length > 0 && visualLines[0]!.segments.length > 0
+      ? Math.max(...visualLines[0]!.segments.map((s) => s.size))
+      : baseFontSize;
   let startY: number;
   if (verticalAlign === "middle") {
-    startY = y + (h - totalHeight) / 2 + baseFontSize;
+    startY = y + (h - totalHeight) / 2 + firstLineSize;
   } else if (verticalAlign === "bottom") {
-    startY = y + h - totalHeight + baseFontSize;
+    startY = y + h - totalHeight + firstLineSize;
   } else {
-    startY = y + baseFontSize;
+    startY = y + firstLineSize;
   }
 
   let currentY = startY;
@@ -510,7 +674,7 @@ async function drawText(
         doc.addImage(img.dataUrl, "PNG", imgX, imgY, imgW, imgH);
         currentY += imgH + baseFontSize * 0.5;
       } else {
-        currentY += lineHeightPx;
+        currentY += baseFontSize * lineHeight;
       }
       continue;
     }
@@ -579,7 +743,12 @@ async function drawText(
       lineX += doc.getTextWidth(seg.text);
     }
 
-    currentY += lineHeightPx;
+    // Advance by line height proportional to the largest segment font size
+    const maxSegSize =
+      vl.segments.length > 0
+        ? Math.max(...vl.segments.map((s) => s.size))
+        : baseFontSize;
+    currentY += maxSegSize * lineHeight;
   }
 }
 
@@ -594,15 +763,25 @@ interface CodeToken {
 
 function parseShikiHtml(html: string): CodeToken[][] {
   const lines: CodeToken[][] = [];
-  // Split by <span class="line"> to get each line
-  const lineRegex = /<span class="line">(.*?)<\/span>/gs;
-  let lineMatch: RegExpExecArray | null;
 
-  while ((lineMatch = lineRegex.exec(html)) !== null) {
-    const lineContent = lineMatch[1]!;
+  // Extract content inside <code>...</code>
+  const codeMatch = html.match(/<code[^>]*>([\s\S]*?)<\/code>/);
+  if (!codeMatch) return lines;
+
+  // Split by <span class="line"> markers to get each line's content.
+  // The previous regex approach failed because (.*?) stopped at the first
+  // inner </span>, losing all tokens after the first per line.
+  const lineParts = codeMatch[1]!.split(/<span class="line">/);
+
+  for (const part of lineParts) {
+    if (part.trim().length === 0) continue;
+
+    // Remove the trailing </span> that closes the line span itself.
+    // There may be a trailing </span>\n or </span></code> etc.
+    const lineContent = part.replace(/<\/span>\s*$/, "");
     const tokens: CodeToken[] = [];
 
-    // Extract spans with style="color:..."
+    // Extract all colored spans within this line
     const tokenRegex =
       /<span style="color:\s*(#[0-9a-fA-F]{3,8})">(.*?)<\/span>/g;
     let tokenMatch: RegExpExecArray | null;
@@ -625,7 +804,7 @@ function parseShikiHtml(html: string): CodeToken[][] {
       lastEnd = tokenMatch.index + tokenMatch[0].length;
     }
 
-    // Remaining text in the line
+    // Remaining text after last token
     if (lastEnd < lineContent.length) {
       const remaining = lineContent.slice(lastEnd).replace(/<[^>]*>/g, "");
       if (remaining.length > 0) {
@@ -673,11 +852,35 @@ async function drawCode(
   const tokenLines = parseShikiHtml(html);
 
   const padding = 16;
-  const lineHeight = fontSize * 1.5;
-  let drawY = y + padding + fontSize;
+  const maxContentW = w - padding * 2;
+
+  // jsPDF Courier is narrower than browser monospace (Consolas).
+  // At 16px: jsPDF=7.2px/char vs browser=8.8px/char (ratio ≈ 1.22).
+  // Scale up fontSize so character widths match the browser rendering.
+  const CHAR_WIDTH_RATIO = 8.8 / 7.2;
+  let effectiveFontSize = fontSize * CHAR_WIDTH_RATIO;
 
   doc.setFont("courier", "normal");
-  doc.setFontSize(fontSize);
+  doc.setFontSize(effectiveFontSize);
+
+  // Auto-fit: if longest line overflows after scaling, shrink to fit
+  let maxLineW = 0;
+  for (const tokens of tokenLines) {
+    let lineW = 0;
+    for (const token of tokens) {
+      lineW += doc.getTextWidth(token.text);
+    }
+    if (lineW > maxLineW) maxLineW = lineW;
+  }
+
+  if (maxLineW > maxContentW && maxLineW > 0) {
+    effectiveFontSize = Math.max(6, effectiveFontSize * (maxContentW / maxLineW));
+    doc.setFontSize(effectiveFontSize);
+  }
+
+  // Use original fontSize for line height and vertical positioning (CSS line-height)
+  const lineHeight = fontSize * 1.5;
+  let drawY = y + padding + fontSize;
 
   for (const tokens of tokenLines) {
     if (drawY > y + h - padding) break;
