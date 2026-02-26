@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import {
   DndContext,
   closestCenter,
@@ -19,6 +19,13 @@ import { nextSlideId } from "@/utils/id";
 import { useAdapter } from "@/contexts/AdapterContext";
 import type { Slide, DeckTheme } from "@/types/deck";
 import type { LayoutInfo } from "@/adapters/types";
+
+interface SlideContextMenuState {
+  x: number;
+  y: number;
+  slideId: string;
+  slideIndex: number;
+}
 
 const CANVAS_W = 960;
 const CANVAS_H = 540;
@@ -43,10 +50,13 @@ export function SlideList() {
   const setSelectedSlides = useDeckStore((s) => s.setSelectedSlides);
   const addSlide = useDeckStore((s) => s.addSlide);
   const deleteSlide = useDeckStore((s) => s.deleteSlide);
+  const toggleSlideHidden = useDeckStore((s) => s.toggleSlideHidden);
   const moveSlide = useDeckStore((s) => s.moveSlide);
   const adapter = useAdapter();
   const listRef = useRef<HTMLDivElement>(null);
   const [showLayoutPicker, setShowLayoutPicker] = useState(false);
+  const [contextMenu, setContextMenu] = useState<SlideContextMenuState | null>(null);
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
   const [layouts, setLayouts] = useState<LayoutInfo[]>([]);
   const [thumbScale, setThumbScale] = useState(DEFAULT_THUMB_SCALE);
 
@@ -168,11 +178,24 @@ export function SlideList() {
                 }
               }}
               onDelete={() => handleDeleteSlide(slide.id, index)}
+              onContextMenu={(x, y) => setContextMenu({ x, y, slideId: slide.id, slideIndex: index })}
               theme={deck.theme}
             />
           ))}
         </SortableContext>
       </DndContext>
+
+      {/* Slide context menu */}
+      {contextMenu && (
+        <SlideContextMenu
+          {...contextMenu}
+          canDelete={deck.slides.length > 1}
+          isHidden={!!deck.slides[contextMenu.slideIndex]?.hidden}
+          onToggleHidden={() => { toggleSlideHidden(contextMenu.slideId); closeContextMenu(); }}
+          onDelete={() => { handleDeleteSlide(contextMenu.slideId, contextMenu.slideIndex); closeContextMenu(); }}
+          onClose={closeContextMenu}
+        />
+      )}
 
       {/* Add slide buttons */}
       <div className="flex gap-1 shrink-0">
@@ -229,6 +252,7 @@ function SortableSlideItem({
   canDelete,
   onSelect,
   onDelete,
+  onContextMenu,
   theme,
 }: {
   slide: Slide;
@@ -239,6 +263,7 @@ function SortableSlideItem({
   canDelete: boolean;
   onSelect: (e: React.MouseEvent) => void;
   onDelete: () => void;
+  onContextMenu: (x: number, y: number) => void;
   theme?: DeckTheme;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
@@ -250,8 +275,16 @@ function SortableSlideItem({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      onContextMenu(e.clientX, e.clientY);
+    },
+    [onContextMenu],
+  );
+
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="relative group shrink-0">
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="relative group shrink-0" onContextMenu={handleContextMenu}>
       <button
         onClick={onSelect}
         className={`rounded border-2 transition-colors p-0.5 ${
@@ -262,8 +295,13 @@ function SortableSlideItem({
               : "border-zinc-700 hover:border-zinc-500"
         }`}
       >
-        <div className="rounded-sm overflow-hidden pointer-events-none">
+        <div className="relative rounded-sm overflow-hidden pointer-events-none">
           <SlideRenderer slide={slide} scale={scale} thumbnail theme={theme} />
+          {slide.hidden && (
+            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+              <span className="text-zinc-400 text-[10px] font-semibold uppercase tracking-wider">Hidden</span>
+            </div>
+          )}
         </div>
         <span className="absolute bottom-0.5 right-1.5 text-[10px] text-zinc-500 font-mono">
           {index + 1}
@@ -280,5 +318,76 @@ function SortableSlideItem({
         </button>
       )}
     </div>
+  );
+}
+
+// ── Slide Context Menu ────────────────────────────────────────────
+
+function SlideContextMenu({
+  x,
+  y,
+  isHidden,
+  canDelete,
+  onToggleHidden,
+  onDelete,
+  onClose,
+}: {
+  x: number;
+  y: number;
+  slideId: string;
+  slideIndex: number;
+  isHidden: boolean;
+  canDelete: boolean;
+  onToggleHidden: () => void;
+  onDelete: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <>
+      <div
+        className="fixed inset-0"
+        style={{ pointerEvents: "auto", zIndex: 40 }}
+        onMouseDown={onClose}
+        onContextMenu={(e) => { e.preventDefault(); onClose(); }}
+      />
+      <div
+        className="fixed bg-zinc-800 border border-zinc-700 rounded-md shadow-xl py-1 min-w-[160px] text-xs"
+        style={{ left: x, top: y, pointerEvents: "auto", zIndex: 50 }}
+      >
+        <ContextMenuItem
+          label={isHidden ? "Show Slide" : "Hide Slide"}
+          onClick={onToggleHidden}
+        />
+        {canDelete && (
+          <>
+            <div className="h-px bg-zinc-700 my-1" />
+            <ContextMenuItem label="Delete" danger onClick={onDelete} />
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+function ContextMenuItem({
+  label,
+  danger,
+  onClick,
+}: {
+  label: string;
+  danger?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={`w-full text-left px-3 py-1.5 flex items-center justify-between gap-4 transition-colors ${
+        danger
+          ? "text-red-400 hover:bg-red-900/30"
+          : "text-zinc-300 hover:bg-zinc-700"
+      }`}
+      onClick={onClick}
+    >
+      {label}
+    </button>
   );
 }

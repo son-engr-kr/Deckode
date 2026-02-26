@@ -78,7 +78,7 @@ export function PrintExport({ onDone }: Props) {
         ref={containerRef}
         style={{ position: "fixed", left: -99999, top: 0 }}
       >
-        {deck.slides.map((slide) => (
+        {deck.slides.filter((s) => !s.hidden).map((slide) => (
           <div
             key={slide.id}
             className="print-export-page"

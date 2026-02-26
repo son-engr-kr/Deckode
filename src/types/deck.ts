@@ -182,6 +182,7 @@ export interface Animation {
 export interface Slide {
   id: string;
   layout?: string;
+  hidden?: boolean;
   background?: SlideBackground;
   transition?: SlideTransition;
   notes?: string;

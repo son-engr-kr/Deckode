@@ -45,6 +45,7 @@ interface DeckState {
   deleteAnimation: (slideId: string, index: number) => void;
   moveAnimation: (slideId: string, fromIndex: number, toIndex: number) => void;
   updateTheme: (patch: Partial<DeckTheme>) => void;
+  toggleSlideHidden: (slideId: string) => void;
   highlightElements: (ids: string[]) => void;
   patchElementById: (elementId: string, patch: Partial<SlideElement>) => void;
   bringToFront: (slideId: string, elementId: string) => void;
@@ -329,6 +330,15 @@ export const useDeckStore = create<DeckState>()(
               merged[key] = { ...prev[key], ...patch[key] } as never;
             }
             state.deck.theme = merged;
+            state.isDirty = true;
+          }),
+
+        toggleSlideHidden: (slideId) =>
+          set((state) => {
+            assert(state.deck !== null, "No deck loaded");
+            const slide = state.deck.slides.find((s) => s.id === slideId);
+            assert(slide !== undefined, `Slide ${slideId} not found`);
+            slide.hidden = !slide.hidden;
             state.isDirty = true;
           }),
 

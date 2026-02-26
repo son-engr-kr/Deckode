@@ -8,6 +8,15 @@ import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/types/deck";
 import type { Deck, Slide, SlideTransition } from "@/types/deck";
 import { AnimatePresence, motion } from "framer-motion";
 
+function useVisibleSlides(deck: Deck | null) {
+  return useMemo(() => {
+    if (!deck) return [];
+    return deck.slides
+      .map((slide, index) => ({ slide, originalIndex: index }))
+      .filter(({ slide }) => !slide.hidden);
+  }, [deck]);
+}
+
 // ── Notes parsing ─────────────────────────────────────────────────
 
 interface NoteSegment {
@@ -62,8 +71,6 @@ export function PresentationMode({ onExit }: PresentationModeProps) {
   const deck = useDeckStore((s) => s.deck);
   const currentSlideIndex = useDeckStore((s) => s.currentSlideIndex);
   const setCurrentSlide = useDeckStore((s) => s.setCurrentSlide);
-  const nextSlideFn = useDeckStore((s) => s.nextSlide);
-  const prevSlideFn = useDeckStore((s) => s.prevSlide);
 
   const [viewMode, setViewMode] = useState<ViewMode>("presenter");
   const [activeStep, setActiveStep] = useState(0);
@@ -76,9 +83,27 @@ export function PresentationMode({ onExit }: PresentationModeProps) {
   }>({ x: 0, y: 0, visible: false });
   const audienceWindowRef = useRef<Window | null>(null);
 
+  const visibleSlides = useVisibleSlides(deck);
+  const visiblePosition = useMemo(
+    () => visibleSlides.findIndex((v) => v.originalIndex === currentSlideIndex),
+    [visibleSlides, currentSlideIndex],
+  );
+
+  // On entering presentation, if current slide is hidden, jump to nearest visible
+  const initialJumpDone = useRef(false);
+  useEffect(() => {
+    if (initialJumpDone.current || visibleSlides.length === 0) return;
+    initialJumpDone.current = true;
+    if (visiblePosition === -1) {
+      setCurrentSlide(visibleSlides[0]!.originalIndex);
+    }
+  }, [visibleSlides, visiblePosition, setCurrentSlide]);
+
   const slide = deck?.slides[currentSlideIndex];
-  const nextSlideData = deck?.slides[currentSlideIndex + 1] ?? null;
-  const totalSlides = deck?.slides.length ?? 0;
+  const nextVisibleSlide = visiblePosition !== -1 && visiblePosition + 1 < visibleSlides.length
+    ? visibleSlides[visiblePosition + 1]!.slide
+    : null;
+  const totalSlides = visibleSlides.length;
 
   const steps = useMemo(
     () => computeSteps(slide?.animations ?? []),
@@ -109,21 +134,34 @@ export function PresentationMode({ onExit }: PresentationModeProps) {
 
   // ── Navigation ──
 
+  const visibleSlidesRef = useRef(visibleSlides);
+  visibleSlidesRef.current = visibleSlides;
+  const visiblePositionRef = useRef(visiblePosition);
+  visiblePositionRef.current = visiblePosition;
+
   const advance = useCallback(() => {
     if (activeStepRef.current < stepsRef.current.length) {
       setActiveStep((prev) => prev + 1);
     } else {
-      nextSlideFn();
+      const vs = visibleSlidesRef.current;
+      const pos = visiblePositionRef.current;
+      if (pos !== -1 && pos + 1 < vs.length) {
+        setCurrentSlide(vs[pos + 1]!.originalIndex);
+      }
     }
-  }, [nextSlideFn]);
+  }, [setCurrentSlide]);
 
   const goBack = useCallback(() => {
     if (activeStepRef.current > 0) {
       setActiveStep((prev) => prev - 1);
     } else {
-      prevSlideFn();
+      const vs = visibleSlidesRef.current;
+      const pos = visiblePositionRef.current;
+      if (pos > 0) {
+        setCurrentSlide(vs[pos - 1]!.originalIndex);
+      }
     }
-  }, [prevSlideFn]);
+  }, [setCurrentSlide]);
 
   const advanceRef = useRef(advance);
   advanceRef.current = advance;
@@ -274,12 +312,12 @@ export function PresentationMode({ onExit }: PresentationModeProps) {
   return (
     <PresenterConsole
       slide={slide}
-      nextSlide={nextSlideData}
+      nextSlide={nextVisibleSlide}
       deck={deck}
       activeStep={activeStep}
       steps={steps}
       noteSegments={noteSegments}
-      currentSlideIndex={currentSlideIndex}
+      currentSlideIndex={visiblePosition !== -1 ? visiblePosition : 0}
       totalSlides={totalSlides}
       elapsed={elapsed}
       pointerActive={pointerActive}

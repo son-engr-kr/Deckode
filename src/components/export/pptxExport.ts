@@ -62,7 +62,7 @@ export async function exportToPptx(deck: Deck): Promise<void> {
   pres.title = deck.meta.title;
   if (deck.meta.author) pres.author = deck.meta.author;
 
-  for (const slide of deck.slides) {
+  for (const slide of deck.slides.filter((s) => !s.hidden)) {
     const pptSlide = pres.addSlide();
 
     // Background
