@@ -28,5 +28,6 @@ export default defineConfig(({ command }) => ({
   test: {
     globals: true,
     environment: "node",
+    exclude: ["tests/**", "node_modules/**"],
   },
 }));

@@ -11,6 +11,7 @@ import { SlideAnimationList } from "./SlideAnimationList";
 import { ThemePanel } from "./ThemePanel";
 import { PresentationMode } from "@/components/presenter/PresentationMode";
 import { exportToPdf } from "@/components/export/pdfExport";
+import { exportToNativePdf } from "@/components/export/pdfNativeExport";
 import { exportToPptx } from "@/components/export/pptxExport";
 import { useAdapter } from "@/contexts/AdapterContext";
 import { useTikzAutoRender } from "@/hooks/useTikzAutoRender";
@@ -44,6 +45,8 @@ export function EditorLayout() {
   const [bottomPanel, setBottomPanel] = useState<BottomPanel>(null);
   const [rightPanel, setRightPanel] = useState<RightPanel>("properties");
   const [presenting, setPresenting] = useState(false);
+  const [pdfMenuOpen, setPdfMenuOpen] = useState(false);
+  const pdfMenuRef = useRef<HTMLDivElement>(null);
   const isDirty = useDeckStore((s) => s.isDirty);
   const isSaving = useDeckStore((s) => s.isSaving);
   const saveToDisk = useDeckStore((s) => s.saveToDisk);
@@ -60,6 +63,18 @@ export function EditorLayout() {
   leftWidthRef.current = leftWidth;
   const rightWidthRef = useRef(rightWidth);
   rightWidthRef.current = rightWidth;
+
+  // Close PDF menu on click outside
+  useEffect(() => {
+    if (!pdfMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (pdfMenuRef.current && !pdfMenuRef.current.contains(e.target as Node)) {
+        setPdfMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [pdfMenuOpen]);
 
   useEffect(() => {
     const onMouseMove = (e: MouseEvent) => {
@@ -241,15 +256,38 @@ export function EditorLayout() {
         >
           Present (F5)
         </button>
-        <button
-          onClick={() => {
-            const deck = useDeckStore.getState().deck;
-            if (deck) exportToPdf(deck, adapter);
-          }}
-          className="text-xs px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
-        >
-          PDF
-        </button>
+        <div className="relative" ref={pdfMenuRef}>
+          <button
+            onClick={() => setPdfMenuOpen(!pdfMenuOpen)}
+            className="text-xs px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+          >
+            PDF ▾
+          </button>
+          {pdfMenuOpen && (
+            <div className="absolute right-0 top-full mt-1 bg-zinc-800 border border-zinc-700 rounded shadow-lg z-50 min-w-[140px]">
+              <button
+                onClick={() => {
+                  setPdfMenuOpen(false);
+                  const deck = useDeckStore.getState().deck;
+                  if (deck) exportToPdf(deck, adapter);
+                }}
+                className="w-full text-left text-xs px-3 py-2 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors"
+              >
+                PDF (Image)
+              </button>
+              <button
+                onClick={() => {
+                  setPdfMenuOpen(false);
+                  const deck = useDeckStore.getState().deck;
+                  if (deck) exportToNativePdf(deck, adapter);
+                }}
+                className="w-full text-left text-xs px-3 py-2 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors"
+              >
+                PDF (Native)
+              </button>
+            </div>
+          )}
+        </div>
         <button
           onClick={() => {
             const deck = useDeckStore.getState().deck;

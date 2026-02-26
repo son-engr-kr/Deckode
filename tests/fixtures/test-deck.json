@@ -1,0 +1,110 @@
+{
+  "deckode": "1.0",
+  "meta": {
+    "title": "Test Deck",
+    "aspectRatio": "16:9"
+  },
+  "slides": [
+    {
+      "id": "slide-1",
+      "elements": [
+        {
+          "id": "title-1",
+          "type": "text",
+          "content": "# Welcome to Deckode\n\nA **native PDF** export test",
+          "position": { "x": 50, "y": 30 },
+          "size": { "w": 860, "h": 120 }
+        },
+        {
+          "id": "code-1",
+          "type": "code",
+          "language": "typescript",
+          "content": "function greet(name: string): string {\n  return `Hello, ${name}!`;\n}",
+          "position": { "x": 50, "y": 170 },
+          "size": { "w": 500, "h": 140 }
+        },
+        {
+          "id": "shape-rect-1",
+          "type": "shape",
+          "shape": "rectangle",
+          "position": { "x": 600, "y": 170 },
+          "size": { "w": 300, "h": 100 },
+          "style": { "fill": "#3b82f6", "stroke": "#60a5fa", "borderRadius": 8 }
+        },
+        {
+          "id": "shape-ellipse-1",
+          "type": "shape",
+          "shape": "ellipse",
+          "position": { "x": 600, "y": 290 },
+          "size": { "w": 150, "h": 100 },
+          "style": { "fill": "#10b981", "stroke": "#34d399" }
+        }
+      ]
+    },
+    {
+      "id": "slide-2",
+      "elements": [
+        {
+          "id": "text-list",
+          "type": "text",
+          "content": "## Features\n\n- Selectable text\n- Vector shapes\n- Syntax highlighted code\n- Native tables",
+          "position": { "x": 50, "y": 30 },
+          "size": { "w": 400, "h": 300 }
+        },
+        {
+          "id": "table-1",
+          "type": "table",
+          "columns": ["Feature", "Image PDF", "Native PDF"],
+          "rows": [
+            ["Text selection", "No", "Yes"],
+            ["Vector shapes", "No", "Yes"],
+            ["File size", "Large", "Small"]
+          ],
+          "position": { "x": 480, "y": 30 },
+          "size": { "w": 430, "h": 200 }
+        },
+        {
+          "id": "arrow-1",
+          "type": "shape",
+          "shape": "arrow",
+          "position": { "x": 200, "y": 400 },
+          "size": { "w": 300, "h": 20 },
+          "style": { "stroke": "#f59e0b", "strokeWidth": 3 }
+        }
+      ]
+    },
+    {
+      "id": "slide-hidden",
+      "hidden": true,
+      "elements": [
+        {
+          "id": "hidden-text",
+          "type": "text",
+          "content": "This slide should NOT appear in PDF",
+          "position": { "x": 50, "y": 50 },
+          "size": { "w": 400, "h": 100 }
+        }
+      ]
+    },
+    {
+      "id": "slide-3",
+      "elements": [
+        {
+          "id": "video-placeholder",
+          "type": "video",
+          "src": "test.mp4",
+          "position": { "x": 50, "y": 50 },
+          "size": { "w": 400, "h": 300 }
+        },
+        {
+          "id": "line-1",
+          "type": "shape",
+          "shape": "line",
+          "position": { "x": 500, "y": 200 },
+          "size": { "w": 400, "h": 4 },
+          "style": { "stroke": "#ef4444", "strokeWidth": 2 }
+        }
+      ]
+    }
+  ]
+}

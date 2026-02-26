@@ -21,44 +21,25 @@ import type {
 } from "@/types/deck";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/types/deck";
 import type { FileSystemAdapter } from "@/adapters/types";
-import { fetchImageAsBase64 } from "@/utils/exportUtils";
+import {
+  fetchImageAsBase64,
+  resolveStyle,
+  resolveAssetSrc,
+  DEFAULT_BG,
+  DEFAULT_TEXT_COLOR,
+  DEFAULT_TEXT_SIZE,
+  DEFAULT_TEXT_FONT,
+  DEFAULT_LINE_HEIGHT,
+  DEFAULT_CODE_SIZE,
+  DEFAULT_CODE_BG,
+  DEFAULT_CODE_FG,
+  DEFAULT_CODE_RADIUS,
+  DEFAULT_CODE_THEME,
+  DEFAULT_TABLE_SIZE,
+} from "@/utils/exportUtils";
 
-// ---- Defaults (matching React renderers exactly) ----
-
-const DEFAULT_BG = "#0f172a";
-const DEFAULT_TEXT_COLOR = "#ffffff";
-const DEFAULT_TEXT_SIZE = 24;
-const DEFAULT_TEXT_FONT = "Inter, system-ui, sans-serif";
-const DEFAULT_LINE_HEIGHT = 1.5;
-const DEFAULT_CODE_SIZE = 16;
-const DEFAULT_CODE_BG = "#1e1e2e";
-const DEFAULT_CODE_FG = "#cdd6f4";
-const DEFAULT_CODE_RADIUS = 8;
-const DEFAULT_CODE_THEME = "github-dark";
-const DEFAULT_TABLE_SIZE = 14;
 const MIN_FONT_SIZE = 6;
 const CAPTURE_SCALE = 2;
-
-// ---- Style resolution (mirrors ThemeContext.resolveStyle) ----
-
-function resolveStyle<T extends object>(
-  theme: Partial<T> | undefined,
-  element: Partial<T> | undefined,
-): Partial<T> {
-  if (!theme) return element ?? ({} as Partial<T>);
-  if (!element) return theme;
-  return { ...theme, ...element };
-}
-
-// ---- Asset URL resolution (delegates to the active adapter) ----
-
-async function resolveAssetSrc(
-  src: string,
-  adapter: FileSystemAdapter,
-): Promise<string> {
-  const result = adapter.resolveAssetUrl(src);
-  return typeof result === "string" ? result : await result;
-}
 
 // ---- HTML escape ----
 

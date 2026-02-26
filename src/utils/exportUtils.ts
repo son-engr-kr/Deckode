@@ -1,3 +1,42 @@
+import type { FileSystemAdapter } from "@/adapters/types";
+
+// ---- Defaults (matching React renderers exactly) ----
+
+export const DEFAULT_BG = "#0f172a";
+export const DEFAULT_TEXT_COLOR = "#ffffff";
+export const DEFAULT_TEXT_SIZE = 24;
+export const DEFAULT_TEXT_FONT = "Inter, system-ui, sans-serif";
+export const DEFAULT_LINE_HEIGHT = 1.5;
+export const DEFAULT_CODE_SIZE = 16;
+export const DEFAULT_CODE_BG = "#1e1e2e";
+export const DEFAULT_CODE_FG = "#cdd6f4";
+export const DEFAULT_CODE_RADIUS = 8;
+export const DEFAULT_CODE_THEME = "github-dark";
+export const DEFAULT_TABLE_SIZE = 14;
+
+// ---- Style resolution (mirrors ThemeContext.resolveStyle) ----
+
+export function resolveStyle<T extends object>(
+  theme: Partial<T> | undefined,
+  element: Partial<T> | undefined,
+): Partial<T> {
+  if (!theme) return element ?? ({} as Partial<T>);
+  if (!element) return theme;
+  return { ...theme, ...element };
+}
+
+// ---- Asset URL resolution (delegates to the active adapter) ----
+
+export async function resolveAssetSrc(
+  src: string,
+  adapter: FileSystemAdapter,
+): Promise<string> {
+  const result = adapter.resolveAssetUrl(src);
+  return typeof result === "string" ? result : await result;
+}
+
+// ----
+
 export function stripMarkdown(md: string): string {
   return md
     .replace(/\*\*(.*?)\*\*/g, "$1")
