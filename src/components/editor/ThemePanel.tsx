@@ -1,13 +1,8 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useDeckStore } from "@/stores/deckStore";
 import type {
+  DeckTheme,
   SlideBackground,
-  TextStyle,
-  CodeStyle,
-  ShapeStyle,
-  ImageStyle,
-  VideoStyle,
-  TikZStyle,
 } from "@/types/deck";
 import {
   ColorField,
@@ -55,26 +50,22 @@ export function ThemePanel() {
   const theme = useDeckStore((s) => s.deck?.theme) ?? {};
   const updateTheme = useDeckStore((s) => s.updateTheme);
 
+  const patchStyle = useCallback(
+    <K extends keyof DeckTheme>(key: K) =>
+      (patch: Partial<NonNullable<DeckTheme[K]>>) =>
+        updateTheme({ [key]: patch } as Partial<DeckTheme>),
+    [updateTheme],
+  );
+
   const patchSlide = (patch: Partial<SlideBackground>) =>
     updateTheme({ slide: { background: { ...theme.slide?.background, ...patch } } });
 
-  const patchText = (patch: Partial<TextStyle>) =>
-    updateTheme({ text: patch });
-
-  const patchCode = (patch: Partial<CodeStyle>) =>
-    updateTheme({ code: patch });
-
-  const patchShape = (patch: Partial<ShapeStyle>) =>
-    updateTheme({ shape: patch });
-
-  const patchImage = (patch: Partial<ImageStyle>) =>
-    updateTheme({ image: patch });
-
-  const patchVideo = (patch: Partial<VideoStyle>) =>
-    updateTheme({ video: patch });
-
-  const patchTikZ = (patch: Partial<TikZStyle>) =>
-    updateTheme({ tikz: patch });
+  const patchText = patchStyle("text");
+  const patchCode = patchStyle("code");
+  const patchShape = patchStyle("shape");
+  const patchImage = patchStyle("image");
+  const patchVideo = patchStyle("video");
+  const patchTikZ = patchStyle("tikz");
 
   return (
     <div className="text-sm">

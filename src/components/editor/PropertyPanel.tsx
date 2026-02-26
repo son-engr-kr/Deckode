@@ -8,6 +8,7 @@ import {
   NumberField,
   SelectField,
   TextField,
+  FieldLabel,
   CODE_THEMES,
   OBJECT_FIT_OPTIONS,
   TEXT_ALIGN_OPTIONS,
@@ -55,7 +56,7 @@ export function PropertyPanel() {
     <div className="p-3 space-y-4 text-sm overflow-y-auto">
       {/* Element info */}
       <div>
-        <div className="text-zinc-400 text-xs uppercase tracking-wider mb-1">Element</div>
+        <FieldLabel>Element</FieldLabel>
         <div className="text-zinc-300 font-mono">
           {element.type} / {element.id}
         </div>
@@ -63,7 +64,7 @@ export function PropertyPanel() {
 
       {/* Position */}
       <div>
-        <div className="text-zinc-400 text-xs uppercase tracking-wider mb-1">Position</div>
+        <FieldLabel>Position</FieldLabel>
         <div className="grid grid-cols-2 gap-2">
           <NumberInput label="X" value={element.position.x} onChange={(v) => handleNumberChange("position.x", v)} />
           <NumberInput label="Y" value={element.position.y} onChange={(v) => handleNumberChange("position.y", v)} />
@@ -72,7 +73,7 @@ export function PropertyPanel() {
 
       {/* Size */}
       <div>
-        <div className="text-zinc-400 text-xs uppercase tracking-wider mb-1">Size</div>
+        <FieldLabel>Size</FieldLabel>
         <div className="grid grid-cols-2 gap-2">
           <NumberInput label="W" value={element.size.w} onChange={(v) => handleNumberChange("size.w", v)} />
           <NumberInput label="H" value={element.size.h} onChange={(v) => handleNumberChange("size.h", v)} />
@@ -82,7 +83,7 @@ export function PropertyPanel() {
       {/* Content (for text/code — not tikz, which has its own editor) */}
       {"content" in element && element.type !== "tikz" && (
         <div>
-          <div className="text-zinc-400 text-xs uppercase tracking-wider mb-1">Content</div>
+          <FieldLabel>Content</FieldLabel>
           <textarea
             className="w-full bg-zinc-800 text-zinc-200 rounded px-2 py-1.5 text-xs font-mono resize-y min-h-20 border border-zinc-700 focus:border-blue-500 focus:outline-none"
             value={element.content}
@@ -125,7 +126,7 @@ export function PropertyPanel() {
       {element.type === "video" && (
         <>
           <div>
-            <div className="text-zinc-400 text-xs uppercase tracking-wider mb-1">Video URL</div>
+            <FieldLabel>Video URL</FieldLabel>
             <input
               type="text"
               className="w-full bg-zinc-800 text-zinc-200 rounded px-2 py-1.5 text-xs font-mono border border-zinc-700 focus:border-blue-500 focus:outline-none"
@@ -136,7 +137,7 @@ export function PropertyPanel() {
             />
           </div>
           <div>
-            <div className="text-zinc-400 text-xs uppercase tracking-wider mb-1">Options</div>
+            <FieldLabel>Options</FieldLabel>
             <div className="space-y-1">
               {(["autoplay", "loop", "muted", "controls"] as const).map((prop) => (
                 <label key={prop} className="flex items-center gap-2 text-xs text-zinc-300">
@@ -209,7 +210,7 @@ function SlidePropertiesPanel({
   return (
     <div className="p-3 space-y-4 text-sm overflow-y-auto">
       <div>
-        <div className="text-zinc-400 text-xs uppercase tracking-wider mb-1">Slide</div>
+        <FieldLabel>Slide</FieldLabel>
         <div className="text-zinc-300 font-mono">
           {selectedSlides.length === 1
             ? selectedSlides[0]!.id
@@ -218,7 +219,7 @@ function SlidePropertiesPanel({
       </div>
 
       <div>
-        <div className="text-zinc-400 text-xs uppercase tracking-wider mb-2">Background</div>
+        <FieldLabel>Background</FieldLabel>
         <div className="space-y-2">
           <ColorField
             label="Color"
@@ -255,9 +256,7 @@ function SlidePropertiesPanel({
       {/* Presenter Notes */}
       {selectedSlides.length === 1 && (
         <div>
-          <div className="text-zinc-400 text-xs uppercase tracking-wider mb-1">
-            Presenter Notes
-          </div>
+          <FieldLabel>Presenter Notes</FieldLabel>
           <div className="text-zinc-600 text-[10px] mb-1">
             Use [step:N]...[/step] to highlight text at animation step N
           </div>
@@ -295,7 +294,7 @@ function ElementStyleEditor({
 
   return (
     <div>
-      <div className="text-zinc-400 text-xs uppercase tracking-wider mb-2">Style</div>
+      <FieldLabel>Style</FieldLabel>
       <div className="space-y-2">
         {element.type === "text" && (
           <>
@@ -471,7 +470,7 @@ function TikZEditor({
       {/* TikZ Code */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <div className="text-zinc-400 text-xs uppercase tracking-wider">TikZ Code</div>
+          <FieldLabel>TikZ Code</FieldLabel>
           <StatusBadge status={status} />
         </div>
         <textarea
@@ -555,11 +554,11 @@ function CustomPropsEditor({
   return (
     <>
       <div>
-        <div className="text-zinc-400 text-xs uppercase tracking-wider mb-1">Component</div>
+        <FieldLabel>Component</FieldLabel>
         <div className="text-purple-300 font-mono text-xs">{element.component}</div>
       </div>
       <div>
-        <div className="text-zinc-400 text-xs uppercase tracking-wider mb-1">Props (JSON)</div>
+        <FieldLabel>Props (JSON)</FieldLabel>
         <textarea
           className="w-full bg-zinc-800 text-zinc-200 rounded px-2 py-1.5 text-xs font-mono resize-y min-h-20 border border-zinc-700 focus:border-blue-500 focus:outline-none"
           value={draft}
@@ -630,7 +629,7 @@ function TableDataEditor({
   return (
     <>
       <div>
-        <div className="text-zinc-400 text-xs uppercase tracking-wider mb-1">Columns</div>
+        <FieldLabel>Columns</FieldLabel>
         <div className="space-y-1">
           {element.columns.map((col, i) => (
             <input
@@ -660,7 +659,7 @@ function TableDataEditor({
       </div>
 
       <div>
-        <div className="text-zinc-400 text-xs uppercase tracking-wider mb-1">Rows</div>
+        <FieldLabel>Rows</FieldLabel>
         <div className="space-y-2">
           {element.rows.map((row, ri) => (
             <div key={ri} className="space-y-1">

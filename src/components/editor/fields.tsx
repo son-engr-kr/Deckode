@@ -1,5 +1,9 @@
 // Shared field components for theme and property panels
 
+export function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <div className="text-zinc-400 text-xs uppercase tracking-wider mb-1">{children}</div>;
+}
+
 export function ColorField({
   label,
   value,
