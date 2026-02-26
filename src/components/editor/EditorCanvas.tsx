@@ -6,6 +6,7 @@ import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/types/deck";
 import type { ImageElement, VideoElement } from "@/types/deck";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { useAdapter } from "@/contexts/AdapterContext";
+import { assert } from "@/utils/assert";
 
 export function EditorCanvas() {
   const deck = useDeckStore((s) => s.deck);
@@ -209,8 +210,4 @@ export function EditorCanvas() {
       </div>
     </div>
   );
-}
-
-function assert(condition: boolean, message: string): asserts condition {
-  if (!condition) throw new Error(`[EditorCanvas] ${message}`);
 }

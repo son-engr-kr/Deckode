@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { TemplateKind, WizardConfig, NewProjectConfig } from "@/utils/projectTemplates";
 import { DARK_THEME, LIGHT_THEME } from "@/utils/projectTemplates";
+import { assert } from "@/utils/assert";
 
 interface Props {
   open: boolean;
@@ -317,8 +318,4 @@ function WizardPreview() {
       <div className="w-8 h-0.5 bg-zinc-600 rounded" />
     </div>
   );
-}
-
-function assert(condition: boolean, message: string): asserts condition {
-  if (!condition) throw new Error(`[NewProjectWizard] ${message}`);
 }

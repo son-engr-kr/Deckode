@@ -9,6 +9,7 @@ import { ViteApiAdapter } from "@/adapters/viteApi";
 import { loadDeckFromDisk } from "@/utils/api";
 import type { FileSystemAdapter } from "@/adapters/types";
 import type { FsAccessAdapter } from "@/adapters/fsAccess";
+import { assert } from "@/utils/assert";
 
 const IS_DEV = import.meta.env.DEV;
 
@@ -169,8 +170,4 @@ export function App() {
       {isAudiencePopup ? <PresenterView /> : <EditorLayout />}
     </AdapterProvider>
   );
-}
-
-function assert(condition: boolean, message: string): asserts condition {
-  if (!condition) throw new Error(`[App] ${message}`);
 }

@@ -1,6 +1,7 @@
 import type { Deck } from "@/types/deck";
 import type { ProjectInfo } from "@/adapters/types";
 import type { NewProjectConfig } from "@/utils/projectTemplates";
+import { assert } from "@/utils/assert";
 
 export type { ProjectInfo };
 
@@ -92,8 +93,4 @@ export async function loadLayout(project: string, layoutName: string): Promise<a
   assert(res.ok, `Failed to load layout: ${res.status}`);
   const data = await res.json();
   return data.slide;
-}
-
-function assert(condition: boolean, message: string): asserts condition {
-  if (!condition) throw new Error(`[API] ${message}`);
 }

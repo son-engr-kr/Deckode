@@ -5,6 +5,7 @@ import { temporal } from "zundo";
 import type { Animation, Deck, DeckTheme, Slide, SlideElement } from "@/types/deck";
 import type { FileSystemAdapter } from "@/adapters/types";
 import { nextElementId } from "@/utils/id";
+import { assert } from "@/utils/assert";
 
 // Module-level adapter reference, set by App when adapter is created
 let _adapter: FileSystemAdapter | null = null;
@@ -62,6 +63,12 @@ let batchStartState: any = null;
 
 export function setDeckDragging(active: boolean) {
   isDragging = active;
+}
+
+function getSlide<T extends { id: string }>(slides: T[], slideId: string): T {
+  const slide = slides.find((s) => s.id === slideId);
+  assert(slide !== undefined, `Slide ${slideId} not found`);
+  return slide;
 }
 
 export const useDeckStore = create<DeckState>()(
@@ -166,8 +173,7 @@ export const useDeckStore = create<DeckState>()(
         updateElement: (slideId, elementId, patch) =>
           set((state) => {
             assert(state.deck !== null, "No deck loaded");
-            const slide = state.deck.slides.find((s) => s.id === slideId);
-            assert(slide !== undefined, `Slide ${slideId} not found`);
+            const slide = getSlide(state.deck.slides, slideId);
             const element = slide.elements.find((e) => e.id === elementId);
             assert(element !== undefined, `Element ${elementId} not found in slide ${slideId}`);
             Object.assign(element, patch);
@@ -190,8 +196,7 @@ export const useDeckStore = create<DeckState>()(
         updateSlide: (slideId, patch) =>
           set((state) => {
             assert(state.deck !== null, "No deck loaded");
-            const slide = state.deck.slides.find((s) => s.id === slideId);
-            assert(slide !== undefined, `Slide ${slideId} not found`);
+            const slide = getSlide(state.deck.slides, slideId);
             Object.assign(slide, patch);
             state.isDirty = true;
           }),
@@ -239,8 +244,7 @@ export const useDeckStore = create<DeckState>()(
         addElement: (slideId, element) =>
           set((state) => {
             assert(state.deck !== null, "No deck loaded");
-            const slide = state.deck.slides.find((s) => s.id === slideId);
-            assert(slide !== undefined, `Slide ${slideId} not found`);
+            const slide = getSlide(state.deck.slides, slideId);
             slide.elements.push(element);
             state.isDirty = true;
           }),
@@ -248,8 +252,7 @@ export const useDeckStore = create<DeckState>()(
         deleteElement: (slideId, elementId) =>
           set((state) => {
             assert(state.deck !== null, "No deck loaded");
-            const slide = state.deck.slides.find((s) => s.id === slideId);
-            assert(slide !== undefined, `Slide ${slideId} not found`);
+            const slide = getSlide(state.deck.slides, slideId);
             const idx = slide.elements.findIndex((e) => e.id === elementId);
             assert(idx !== -1, `Element ${elementId} not found in slide ${slideId}`);
             slide.elements.splice(idx, 1);
@@ -265,8 +268,7 @@ export const useDeckStore = create<DeckState>()(
         duplicateElement: (slideId, elementId) =>
           set((state) => {
             assert(state.deck !== null, "No deck loaded");
-            const slide = state.deck.slides.find((s) => s.id === slideId);
-            assert(slide !== undefined, `Slide ${slideId} not found`);
+            const slide = getSlide(state.deck.slides, slideId);
             const element = slide.elements.find((e) => e.id === elementId);
             assert(element !== undefined, `Element ${elementId} not found in slide ${slideId}`);
             const clone = JSON.parse(JSON.stringify(element)) as SlideElement;
@@ -280,8 +282,7 @@ export const useDeckStore = create<DeckState>()(
         addAnimation: (slideId, animation) =>
           set((state) => {
             assert(state.deck !== null, "No deck loaded");
-            const slide = state.deck.slides.find((s) => s.id === slideId);
-            assert(slide !== undefined, `Slide ${slideId} not found`);
+            const slide = getSlide(state.deck.slides, slideId);
             if (!slide.animations) slide.animations = [];
             slide.animations.push(animation);
             state.isDirty = true;
@@ -290,8 +291,7 @@ export const useDeckStore = create<DeckState>()(
         updateAnimation: (slideId, index, patch) =>
           set((state) => {
             assert(state.deck !== null, "No deck loaded");
-            const slide = state.deck.slides.find((s) => s.id === slideId);
-            assert(slide !== undefined, `Slide ${slideId} not found`);
+            const slide = getSlide(state.deck.slides, slideId);
             assert(slide.animations !== undefined && index >= 0 && index < slide.animations.length, `Animation index ${index} out of bounds`);
             Object.assign(slide.animations[index]!, patch);
             state.isDirty = true;
@@ -300,8 +300,7 @@ export const useDeckStore = create<DeckState>()(
         deleteAnimation: (slideId, index) =>
           set((state) => {
             assert(state.deck !== null, "No deck loaded");
-            const slide = state.deck.slides.find((s) => s.id === slideId);
-            assert(slide !== undefined, `Slide ${slideId} not found`);
+            const slide = getSlide(state.deck.slides, slideId);
             assert(slide.animations !== undefined && index >= 0 && index < slide.animations.length, `Animation index ${index} out of bounds`);
             slide.animations.splice(index, 1);
             state.isDirty = true;
@@ -310,8 +309,7 @@ export const useDeckStore = create<DeckState>()(
         moveAnimation: (slideId, fromIndex, toIndex) =>
           set((state) => {
             assert(state.deck !== null, "No deck loaded");
-            const slide = state.deck.slides.find((s) => s.id === slideId);
-            assert(slide !== undefined, `Slide ${slideId} not found`);
+            const slide = getSlide(state.deck.slides, slideId);
             assert(slide.animations !== undefined, `Slide ${slideId} has no animations`);
             const anims = slide.animations;
             assert(fromIndex >= 0 && fromIndex < anims.length, `fromIndex ${fromIndex} out of bounds`);
@@ -336,8 +334,7 @@ export const useDeckStore = create<DeckState>()(
         toggleSlideHidden: (slideId) =>
           set((state) => {
             assert(state.deck !== null, "No deck loaded");
-            const slide = state.deck.slides.find((s) => s.id === slideId);
-            assert(slide !== undefined, `Slide ${slideId} not found`);
+            const slide = getSlide(state.deck.slides, slideId);
             slide.hidden = !slide.hidden;
             state.isDirty = true;
           }),
@@ -354,8 +351,7 @@ export const useDeckStore = create<DeckState>()(
         bringToFront: (slideId, elementId) =>
           set((state) => {
             assert(state.deck !== null, "No deck loaded");
-            const slide = state.deck.slides.find((s) => s.id === slideId);
-            assert(slide !== undefined, `Slide ${slideId} not found`);
+            const slide = getSlide(state.deck.slides, slideId);
             const idx = slide.elements.findIndex((e) => e.id === elementId);
             assert(idx !== -1, `Element ${elementId} not found`);
             if (idx === slide.elements.length - 1) return; // already front
@@ -367,8 +363,7 @@ export const useDeckStore = create<DeckState>()(
         sendToBack: (slideId, elementId) =>
           set((state) => {
             assert(state.deck !== null, "No deck loaded");
-            const slide = state.deck.slides.find((s) => s.id === slideId);
-            assert(slide !== undefined, `Slide ${slideId} not found`);
+            const slide = getSlide(state.deck.slides, slideId);
             const idx = slide.elements.findIndex((e) => e.id === elementId);
             assert(idx !== -1, `Element ${elementId} not found`);
             if (idx === 0) return; // already back
@@ -439,6 +434,3 @@ useDeckStore.subscribe(
   },
 );
 
-function assert(condition: boolean, message: string): asserts condition {
-  if (!condition) throw new Error(`[DeckStore] ${message}`);
-}

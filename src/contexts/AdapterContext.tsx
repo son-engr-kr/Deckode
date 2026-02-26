@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import type { FileSystemAdapter } from "@/adapters/types";
+import { assert } from "@/utils/assert";
 
 const AdapterContext = createContext<FileSystemAdapter | null>(null);
 
@@ -67,8 +68,4 @@ export function useAssetUrl(src: string | undefined): string | undefined {
   }, [src, adapter]);
 
   return url;
-}
-
-function assert(condition: boolean, message: string): asserts condition {
-  if (!condition) throw new Error(`[AdapterContext] ${message}`);
 }

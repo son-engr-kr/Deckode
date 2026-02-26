@@ -1,6 +1,7 @@
 import type { Deck } from "@/types/deck";
 import type { FileSystemAdapter, ProjectInfo } from "./types";
 import type { NewProjectConfig } from "@/utils/projectTemplates";
+import { assert } from "@/utils/assert";
 import {
   listProjects as apiListProjects,
   createProject as apiCreateProject,
@@ -74,8 +75,4 @@ export class ViteApiAdapter implements FileSystemAdapter {
   async loadLayout(layoutName: string) {
     return apiLoadLayout(this.projectName, layoutName);
   }
-}
-
-function assert(condition: boolean, message: string): asserts condition {
-  if (!condition) throw new Error(`[ViteApiAdapter] ${message}`);
 }

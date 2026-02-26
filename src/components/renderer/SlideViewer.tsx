@@ -5,6 +5,7 @@ import { SlideRenderer } from "./SlideRenderer";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/types/deck";
 import type { SlideTransition } from "@/types/deck";
 import { computeSteps } from "@/utils/animationSteps";
+import { assert } from "@/utils/assert";
 
 const transitionVariants = {
   fade: {
@@ -132,8 +133,4 @@ export function SlideViewer() {
       </div>
     </div>
   );
-}
-
-function assert(condition: boolean, message: string): asserts condition {
-  if (!condition) throw new Error(`[SlideViewer] ${message}`);
 }

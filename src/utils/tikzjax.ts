@@ -12,6 +12,8 @@
  * Assets served from /tikzjax/ (copied from node_modules by postinstall).
  */
 
+import { assert } from "@/utils/assert";
+
 // Respect Vite's base path (e.g. "/deckode/" for GitHub Pages)
 const TIKZJAX_BASE = `${import.meta.env.BASE_URL}tikzjax`.replace(/\/\//g, "/");
 
@@ -309,8 +311,4 @@ export async function renderTikzToSvg(
   await setCachedSvg(content, fullPreamble, svgWithFonts);
 
   return svgWithFonts;
-}
-
-function assert(condition: boolean, message: string): asserts condition {
-  if (!condition) throw new Error(`[tikzjax] ${message}`);
 }

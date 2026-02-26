@@ -3,6 +3,7 @@ import type { FileSystemAdapter, ProjectInfo } from "./types";
 import type { NewProjectConfig } from "@/utils/projectTemplates";
 import { saveHandle, clearHandle } from "@/utils/handleStore";
 import { generateBlankDeck, generateWizardDeck } from "@/utils/projectTemplates";
+import { assert } from "@/utils/assert";
 
 // Bundled template data for prod/FS Access mode (no server available)
 import exampleDeck from "../../templates/default/deck.json";
@@ -316,8 +317,4 @@ async function writeTextFile(
   const writable = await fh.createWritable();
   await writable.write(content);
   await writable.close();
-}
-
-function assert(condition: boolean, message: string): asserts condition {
-  if (!condition) throw new Error(`[FsAccessAdapter] ${message}`);
 }

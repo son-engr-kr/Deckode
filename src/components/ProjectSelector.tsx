@@ -20,6 +20,7 @@ import { NewProjectWizard } from "./NewProjectWizard";
 import type { FileSystemAdapter } from "@/adapters/types";
 import type { ProjectInfo } from "@/utils/api";
 import type { NewProjectConfig } from "@/utils/projectTemplates";
+import { assert } from "@/utils/assert";
 
 interface Props {
   isDevMode: boolean;
@@ -346,8 +347,4 @@ function formatRelativeTime(timestamp: number): string {
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days}d ago`;
   return new Date(timestamp).toLocaleDateString();
-}
-
-function assert(condition: boolean, message: string): asserts condition {
-  if (!condition) throw new Error(`[ProjectSelector] ${message}`);
 }
