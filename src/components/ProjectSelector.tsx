@@ -17,6 +17,7 @@ import {
   loadDeckFromDisk,
 } from "@/utils/api";
 import { NewProjectWizard } from "./NewProjectWizard";
+import { GitHubDialog } from "./GitHubDialog";
 import type { FileSystemAdapter } from "@/adapters/types";
 import type { ProjectInfo } from "@/utils/api";
 import type { NewProjectConfig } from "@/utils/projectTemplates";
@@ -41,6 +42,7 @@ function ViteProjectSelector({ onAdapterReady }: { onAdapterReady: (adapter: Fil
   const [loading, setLoading] = useState(true);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [ghDialogOpen, setGhDialogOpen] = useState(false);
 
   const fetchProjects = () => {
     listProjects().then((p) => {
@@ -132,6 +134,12 @@ function ViteProjectSelector({ onAdapterReady }: { onAdapterReady: (adapter: Fil
             >
               Try Demo
             </button>
+            <button
+              onClick={() => setGhDialogOpen(true)}
+              className="px-4 py-2.5 rounded bg-zinc-700 border border-zinc-600 text-sm text-zinc-200 hover:bg-zinc-600 transition-colors"
+            >
+              Open from GitHub
+            </button>
           </div>
         </div>
       </div>
@@ -141,6 +149,11 @@ function ViteProjectSelector({ onAdapterReady }: { onAdapterReady: (adapter: Fil
         onClose={() => setWizardOpen(false)}
         onConfirm={handleWizardConfirm}
         showNameField={true}
+      />
+
+      <GitHubDialog
+        open={ghDialogOpen}
+        onClose={() => setGhDialogOpen(false)}
       />
     </div>
   );
@@ -153,6 +166,7 @@ function FsAccessProjectSelector({ onAdapterReady }: { onAdapterReady: (adapter:
   const [restoring, setRestoring] = useState(true);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [ghDialogOpen, setGhDialogOpen] = useState(false);
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
 
   const loadRecentProjects = () => {
@@ -297,6 +311,12 @@ function FsAccessProjectSelector({ onAdapterReady }: { onAdapterReady: (adapter:
           >
             Try Demo
           </button>
+          <button
+            onClick={() => setGhDialogOpen(true)}
+            className="px-6 py-3 rounded-lg bg-zinc-800 border border-zinc-600 text-sm font-medium text-zinc-200 hover:border-zinc-400 hover:bg-zinc-700 transition-colors"
+          >
+            Open from GitHub
+          </button>
         </div>
 
         {recentProjects.length > 0 && (
@@ -346,6 +366,11 @@ function FsAccessProjectSelector({ onAdapterReady }: { onAdapterReady: (adapter:
         onClose={() => setWizardOpen(false)}
         onConfirm={handleNewProject}
         showNameField={true}
+      />
+
+      <GitHubDialog
+        open={ghDialogOpen}
+        onClose={() => setGhDialogOpen(false)}
       />
     </div>
   );

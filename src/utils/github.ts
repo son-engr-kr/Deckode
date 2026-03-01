@@ -45,6 +45,60 @@ export function buildGitHubRawBase(source: GitHubSource): string {
 }
 
 /**
+ * Parses a full GitHub URL into a GitHubSource.
+ * Accepts:
+ *   - Full URL: https://github.com/owner/repo/tree/branch/path/to/folder
+ *   - Short format: owner/repo/path@branch (delegates to parseGitHubParam)
+ *
+ * Returns null if the input cannot be parsed.
+ */
+export function parseGitHubUrl(input: string): GitHubSource | null {
+  const trimmed = input.trim();
+  if (trimmed.length === 0) return null;
+
+  // Try full GitHub URL
+  const urlPattern = /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/tree\/([^/]+)\/?(.*)$/;
+  const match = trimmed.match(urlPattern);
+  if (match) {
+    const owner = match[1]!;
+    const repo = match[2]!;
+    const branch = match[3]!;
+    const path = match[4]?.replace(/\/$/, "") ?? "";
+    return { owner, repo, path, branch };
+  }
+
+  // Try short format (must have at least owner/repo)
+  if (!trimmed.startsWith("http") && trimmed.includes("/")) {
+    const parts = trimmed.split("/");
+    if (parts.length >= 2 && parts[0]!.length > 0 && parts[1]!.length > 0) {
+      return parseGitHubParam(trimmed);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Builds a Deckode URL from a GitHubSource.
+ * Returns both editor and presentation URLs.
+ */
+export function buildDeckodeUrls(
+  origin: string,
+  pathname: string,
+  source: GitHubSource,
+): { editor: string; present: string } {
+  const branchSuffix = source.branch !== "main" ? `@${source.branch}` : "";
+  const ghParam = source.path
+    ? `${source.owner}/${source.repo}/${source.path}${branchSuffix}`
+    : `${source.owner}/${source.repo}${branchSuffix}`;
+  const base = `${origin}${pathname}`;
+  return {
+    editor: `${base}?gh=${ghParam}`,
+    present: `${base}?gh=${ghParam}&mode=present`,
+  };
+}
+
+/**
  * Fetches deck.json from a GitHub repo and returns it as a Deck.
  */
 export async function fetchGitHubDeck(source: GitHubSource): Promise<Deck> {
