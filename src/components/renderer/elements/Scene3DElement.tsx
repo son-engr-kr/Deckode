@@ -256,15 +256,17 @@ export function Scene3DElementRenderer({ element, sceneStep, thumbnail }: Props)
     return 500;
   }, [sceneStep, keyframes]);
 
-  // The slide container applies CSS transform: scale() which breaks R3F's internal
-  // ResizeObserver — getBoundingClientRect returns the scaled-down painted size,
-  // shrinking the WebGL viewport to the top-left. Additionally, during fullscreen
-  // transitions the observer fires rapidly, causing layout feedback loops (shaking).
+  // R3F Canvas has an internal ResizeObserver that causes two problems when the
+  // slide container uses CSS transform: scale():
+  //   1. getBoundingClientRect() returns the scaled-down size → viewport shrinks
+  //   2. During fullscreen transitions the observer fires rapidly, causing layout
+  //      feedback loops that make the slide list panel oscillate in size.
   //
-  // offsetSize: use offsetWidth/offsetHeight (immune to CSS transforms) for correct sizing.
-  // debounce: dampen resize observer callbacks to prevent layout thrashing during transitions.
+  // Fix: position the Canvas absolutely inside a relative container. This removes
+  // it from normal layout flow, so its ResizeObserver cannot affect flex siblings.
+  // offsetSize: true ensures it reads offsetWidth/Height (immune to CSS transforms).
   const resizeConfig = useMemo(
-    () => ({ offsetSize: true, debounce: { scroll: 0, resize: 100 } }),
+    () => ({ offsetSize: true, scroll: false }),
     [],
   );
 
@@ -275,17 +277,19 @@ export function Scene3DElementRenderer({ element, sceneStep, thumbnail }: Props)
         height: "100%",
         borderRadius,
         overflow: "hidden",
+        position: "relative",
       }}
     >
-      <Canvas
-        camera={{
-          position: cameraState.position,
-          fov: cameraState.fov,
-        }}
-        style={{ background: scene.background ?? "transparent" }}
-        gl={{ preserveDrawingBuffer: true }}
-        resize={resizeConfig}
-      >
+      <div style={{ position: "absolute", inset: 0 }}>
+        <Canvas
+          camera={{
+            position: cameraState.position,
+            fov: cameraState.fov,
+          }}
+          style={{ background: scene.background ?? "transparent" }}
+          gl={{ preserveDrawingBuffer: true }}
+          resize={resizeConfig}
+        >
         {/* Lights */}
         <ambientLight intensity={scene.ambientLight ?? 0.5} />
         {scene.directionalLight && (
@@ -330,6 +334,7 @@ export function Scene3DElementRenderer({ element, sceneStep, thumbnail }: Props)
         {/* Orbit controls */}
         {scene.orbitControls && <OrbitControls />}
       </Canvas>
+      </div>
     </div>
   );
 }

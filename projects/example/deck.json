@@ -2552,6 +2552,24 @@
       },
       "elements": [
         {
+          "id": "e100",
+          "type": "text",
+          "content": "It's ",
+          "position": {
+            "x": 132,
+            "y": 212
+          },
+          "size": {
+            "w": 350,
+            "h": 180
+          },
+          "style": {
+            "fontSize": 14,
+            "color": "#cbd5e1",
+            "lineHeight": 1.6
+          }
+        },
+        {
           "id": "s3d-title",
           "type": "text",
           "content": "## 3D Scenes",
@@ -2590,8 +2608,8 @@
           "id": "s3d-main",
           "type": "scene3d",
           "position": {
-            "x": 30,
-            "y": 130
+            "x": 22,
+            "y": 386
           },
           "size": {
             "w": 520,

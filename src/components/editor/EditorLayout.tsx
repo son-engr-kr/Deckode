@@ -323,7 +323,7 @@ export function EditorLayout() {
       <div className="flex-1 flex overflow-hidden">
         {/* Slide list sidebar */}
         <div
-          style={{ width: leftWidth }}
+          style={{ width: leftWidth, scrollbarGutter: "stable" }}
           className="overflow-y-auto shrink-0 border-r border-zinc-800"
         >
           <SlideList />
