@@ -3,6 +3,7 @@ import type { Slide, Animation, DeckTheme } from "@/types/deck";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/types/deck";
 import type { AnimationStep } from "@/utils/animationSteps";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { useAssetUrl } from "@/contexts/AdapterContext";
 import { ElementRenderer } from "./ElementRenderer";
 
 interface Props {
@@ -29,6 +30,7 @@ interface Props {
 export function SlideRenderer({ slide, scale, animate, thumbnail, activeStep, steps, onAdvance, theme, previewAnimations, previewDelayOverrides, previewKey }: Props) {
   const bg = slide.background;
   const themeBgColor = theme?.slide?.background?.color;
+  const resolvedBgImage = useAssetUrl(bg?.image);
 
   const isPreview = previewAnimations !== null && previewAnimations !== undefined && previewAnimations.length > 0;
 
@@ -91,7 +93,7 @@ export function SlideRenderer({ slide, scale, animate, thumbnail, activeStep, st
           transform: `scale(${scale})`,
           transformOrigin: "top left",
           backgroundColor: bg?.color ?? themeBgColor ?? "#0f172a",
-          backgroundImage: bg?.image ? `url(${bg.image})` : undefined,
+          backgroundImage: resolvedBgImage ? `url(${resolvedBgImage})` : undefined,
           backgroundSize: "cover",
           backgroundPosition: "center",
           position: "absolute",

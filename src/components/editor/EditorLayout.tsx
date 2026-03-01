@@ -42,10 +42,12 @@ type RightPanel = "properties" | "theme";
 export function EditorLayout() {
   useTikzAutoRender();
   const adapter = useAdapter();
+  const isReadOnly = adapter.mode === "readonly";
   const [bottomPanel, setBottomPanel] = useState<BottomPanel>(null);
   const [rightPanel, setRightPanel] = useState<RightPanel>("properties");
   const [presenting, setPresenting] = useState(false);
   const [pdfMenuOpen, setPdfMenuOpen] = useState(false);
+  const [shareToast, setShareToast] = useState(false);
   const pdfMenuRef = useRef<HTMLDivElement>(null);
   const isDirty = useDeckStore((s) => s.isDirty);
   const isSaving = useDeckStore((s) => s.isSaving);
@@ -207,20 +209,33 @@ export function EditorLayout() {
       {/* Toolbar */}
       <div className="h-10 border-b border-zinc-800 flex items-center px-4 gap-4 shrink-0">
         <button
-          onClick={() => { skipNextRestore(); useDeckStore.getState().closeProject(); }}
+          onClick={() => {
+            if (isReadOnly) {
+              history.replaceState(null, "", window.location.pathname);
+            } else {
+              skipNextRestore();
+            }
+            useDeckStore.getState().closeProject();
+          }}
           className="text-xs px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
           title="Back to projects"
         >
-          Projects
+          {isReadOnly ? "Back" : "Projects"}
         </button>
         <span className="text-sm font-semibold text-zinc-300">
           {useDeckStore.getState().currentProject}
         </span>
 
-        {/* Save status */}
-        <span className="text-xs text-zinc-500">
-          {isSaving ? "Saving..." : isDirty ? "Unsaved" : "Saved"}
-        </span>
+        {/* Save status / Read-only badge */}
+        {isReadOnly ? (
+          <span className="text-xs px-2 py-0.5 rounded bg-amber-600/20 text-amber-400 border border-amber-600/30">
+            Read-Only
+          </span>
+        ) : (
+          <span className="text-xs text-zinc-500">
+            {isSaving ? "Saving..." : isDirty ? "Unsaved" : "Saved"}
+          </span>
+        )}
 
         <div className="flex-1" />
 
@@ -243,13 +258,29 @@ export function EditorLayout() {
 
         <ElementPalette />
 
-        <button
-          onClick={handleSave}
-          disabled={!isDirty || isSaving}
-          className="text-xs px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 disabled:opacity-30 transition-colors"
-        >
-          Save
-        </button>
+        {isReadOnly ? (
+          <button
+            onClick={() => {
+              const params = new URLSearchParams(window.location.search);
+              params.set("mode", "present");
+              const shareUrl = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+              navigator.clipboard.writeText(shareUrl);
+              setShareToast(true);
+              setTimeout(() => setShareToast(false), 2000);
+            }}
+            className="text-xs px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors relative"
+          >
+            {shareToast ? "Copied!" : "Share"}
+          </button>
+        ) : (
+          <button
+            onClick={handleSave}
+            disabled={!isDirty || isSaving}
+            className="text-xs px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 disabled:opacity-30 transition-colors"
+          >
+            Save
+          </button>
+        )}
         <button
           onClick={startPresentation}
           className="text-xs px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"

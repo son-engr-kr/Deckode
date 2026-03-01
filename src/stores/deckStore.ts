@@ -126,6 +126,7 @@ export const useDeckStore = create<DeckState>()(
         saveToDisk: async () => {
           const { deck, isSaving, currentProject } = get();
           if (!deck || isSaving || !currentProject || !_adapter) return;
+          if (_adapter.mode === "readonly") return;
           set((state) => { state.isSaving = true; });
           await _adapter.saveDeck(deck);
           set((state) => { state.isSaving = false; state.isDirty = false; });

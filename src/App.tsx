@@ -3,12 +3,16 @@ import { useDeckStore } from "@/stores/deckStore";
 import { setStoreAdapter } from "@/stores/deckStore";
 import { EditorLayout } from "@/components/editor/EditorLayout";
 import { PresenterView } from "@/components/presenter/PresenterView";
+import { ViewOnlyPresentation } from "@/components/presenter/ViewOnlyPresentation";
 import { ProjectSelector } from "@/components/ProjectSelector";
 import { AdapterProvider } from "@/contexts/AdapterContext";
 import { ViteApiAdapter } from "@/adapters/viteApi";
+import { ReadOnlyAdapter } from "@/adapters/readOnly";
 import { loadDeckFromDisk } from "@/utils/api";
+import { parseGitHubParam, buildGitHubRawBase, fetchGitHubDeck } from "@/utils/github";
 import type { FileSystemAdapter } from "@/adapters/types";
 import type { FsAccessAdapter } from "@/adapters/fsAccess";
+import type { Deck } from "@/types/deck";
 import { assert } from "@/utils/assert";
 
 const IS_DEV = import.meta.env.DEV;
@@ -17,11 +21,72 @@ export function App() {
   const currentProject = useDeckStore((s) => s.currentProject);
   const [adapter, setAdapter] = useState<FileSystemAdapter | null>(null);
   const [externalChange, setExternalChange] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Capture URL params once on mount
+  const [isPresentMode] = useState(() => {
+    return new URLSearchParams(window.location.search).get("mode") === "present";
+  });
+
+  const [isAudiencePopup] = useState(() => {
+    const mode = new URLSearchParams(window.location.search).get("mode");
+    return mode === "audience" || mode === "presenter";
+  });
+
+  // Helper to open a readonly adapter
+  const openReadOnly = useCallback((readOnlyAdapter: ReadOnlyAdapter) => {
+    setAdapter(readOnlyAdapter);
+    setStoreAdapter(readOnlyAdapter);
+    readOnlyAdapter.loadDeck().then((deck) => {
+      useDeckStore.getState().openProject(readOnlyAdapter.projectName, deck);
+    });
+  }, []);
+
+  // URL param routing on mount: ?demo, ?gh=...
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    // ?demo → load bundled example deck
+    if (params.has("demo")) {
+      setLoading(true);
+      import("../projects/example/deck.json").then((mod) => {
+        const deck = mod.default as unknown as Deck;
+        const assetBaseUrl = import.meta.env.BASE_URL + "demo-assets";
+        const readOnlyAdapter = ReadOnlyAdapter.fromBundled(deck, assetBaseUrl);
+        openReadOnly(readOnlyAdapter);
+        setLoading(false);
+      });
+      return;
+    }
+
+    // ?gh=owner/repo[/path][@branch] → fetch from GitHub
+    const ghParam = params.get("gh");
+    if (ghParam) {
+      setLoading(true);
+      const source = parseGitHubParam(ghParam);
+      const rawBase = buildGitHubRawBase(source);
+      fetchGitHubDeck(source)
+        .then((deck) => {
+          const name = `${source.owner}/${source.repo}`;
+          const readOnlyAdapter = ReadOnlyAdapter.fromRemote(name, deck, rawBase + "/assets");
+          openReadOnly(readOnlyAdapter);
+          setLoading(false);
+        })
+        .catch((err) => {
+          setLoadError(err instanceof Error ? err.message : String(err));
+          setLoading(false);
+        });
+      return;
+    }
+  }, [openReadOnly]);
 
   // In dev mode, auto-open project from URL query param
   useEffect(() => {
     if (!IS_DEV) return;
     const params = new URLSearchParams(window.location.search);
+    // Skip if demo or gh param is present (handled above)
+    if (params.has("demo") || params.has("gh")) return;
     const project = params.get("project");
     if (project) {
       const viteAdapter = new ViteApiAdapter(project);
@@ -33,18 +98,13 @@ export function App() {
     }
   }, []);
 
-  // Capture URL mode once on mount — the URL sync effect below may strip
-  // query params before the next render, so we must read this eagerly.
-  const [isAudiencePopup] = useState(() => {
-    const mode = new URLSearchParams(window.location.search).get("mode");
-    return mode === "audience" || mode === "presenter";
-  });
-
   // Sync URL when project changes (dev mode only)
   useEffect(() => {
     if (!IS_DEV) return;
+    // Don't overwrite URL for demo/gh modes
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("demo") || params.has("gh")) return;
     if (currentProject) {
-      const params = new URLSearchParams(window.location.search);
       params.set("project", currentProject);
       history.replaceState(null, "", `?${params.toString()}`);
     } else {
@@ -60,12 +120,10 @@ export function App() {
       if (data.project !== state.currentProject || !adapter) return;
 
       if (!state.isDirty) {
-        // Clean → auto-reload
         adapter.loadDeck().then((deck) => {
           useDeckStore.getState().loadDeck(deck);
         });
       } else {
-        // Dirty → show conflict bar
         setExternalChange(true);
       }
     };
@@ -86,7 +144,6 @@ export function App() {
       const file = await fileHandle.getFile();
       const modified = file.lastModified;
 
-      // Initialize on first poll
       if (lastModifiedRef.current === 0) {
         lastModifiedRef.current = modified;
         return;
@@ -95,7 +152,6 @@ export function App() {
       if (modified === lastModifiedRef.current) return;
       lastModifiedRef.current = modified;
 
-      // Filter own saves (2s window)
       if (Date.now() - fsAdapter.lastSaveTs < 2000) return;
 
       const state = useDeckStore.getState();
@@ -137,6 +193,46 @@ export function App() {
     }
   }, [currentProject]);
 
+  // Exit present mode → remove mode=present from URL, re-render as editor
+  const handleExitPresent = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
+    params.delete("mode");
+    const qs = params.toString();
+    history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+    // Force re-render by reloading (simplest approach since isPresentMode is captured once)
+    window.location.reload();
+  }, []);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-zinc-950 text-zinc-400">
+        Loading deck...
+      </div>
+    );
+  }
+
+  // Load error state
+  if (loadError) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-zinc-950 text-white">
+        <div className="max-w-md text-center">
+          <h1 className="text-xl font-bold text-red-400 mb-4">Failed to load deck</h1>
+          <p className="text-sm text-zinc-400 mb-6">{loadError}</p>
+          <button
+            onClick={() => {
+              history.replaceState(null, "", window.location.pathname);
+              window.location.reload();
+            }}
+            className="px-4 py-2 rounded bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors text-sm"
+          >
+            Back to Projects
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!currentProject) {
     return (
       <ProjectSelector
@@ -148,9 +244,18 @@ export function App() {
 
   assert(adapter !== null, "Adapter must be set when a project is open");
 
+  // Present mode (for shared links)
+  if (isPresentMode) {
+    return (
+      <AdapterProvider adapter={adapter}>
+        <ViewOnlyPresentation onExit={handleExitPresent} />
+      </AdapterProvider>
+    );
+  }
+
   return (
     <AdapterProvider adapter={adapter}>
-      {externalChange && (
+      {externalChange && adapter.mode !== "readonly" && (
         <div className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center gap-3 px-4 py-2 bg-amber-600 text-white text-sm font-medium shadow-lg">
           <span>deck.json was modified externally</span>
           <button

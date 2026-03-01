@@ -118,13 +118,21 @@ function ViteProjectSelector({ onAdapterReady }: { onAdapterReady: (adapter: Fil
         {/* New project */}
         <div className="border border-zinc-800 rounded-lg p-4 bg-zinc-900">
           <h2 className="text-sm font-semibold text-zinc-300 mb-3">New Project</h2>
-          <button
-            onClick={() => setWizardOpen(true)}
-            disabled={creating}
-            className="w-full px-4 py-2.5 rounded bg-blue-600 text-sm text-white hover:bg-blue-500 disabled:opacity-40 transition-colors"
-          >
-            {creating ? "Creating..." : "Create New Project"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setWizardOpen(true)}
+              disabled={creating}
+              className="flex-1 px-4 py-2.5 rounded bg-blue-600 text-sm text-white hover:bg-blue-500 disabled:opacity-40 transition-colors"
+            >
+              {creating ? "Creating..." : "Create New Project"}
+            </button>
+            <button
+              onClick={() => { window.location.search = "?demo"; }}
+              className="px-4 py-2.5 rounded bg-zinc-700 border border-zinc-600 text-sm text-zinc-200 hover:bg-zinc-600 transition-colors"
+            >
+              Try Demo
+            </button>
+          </div>
         </div>
       </div>
 
@@ -282,6 +290,12 @@ function FsAccessProjectSelector({ onAdapterReady }: { onAdapterReady: (adapter:
             className="px-6 py-3 rounded-lg bg-blue-600 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 transition-colors"
           >
             {creating ? "Creating..." : "New Project"}
+          </button>
+          <button
+            onClick={() => { window.location.search = "?demo"; }}
+            className="px-6 py-3 rounded-lg bg-zinc-800 border border-zinc-600 text-sm font-medium text-zinc-200 hover:border-zinc-400 hover:bg-zinc-700 transition-colors"
+          >
+            Try Demo
           </button>
         </div>
 

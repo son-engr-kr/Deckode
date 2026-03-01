@@ -33,7 +33,7 @@ export interface FileSystemAdapter {
   listComponents(): Promise<string[]>;
   listLayouts(): Promise<LayoutInfo[]>;
   loadLayout(layoutName: string): Promise<import("@/types/deck").Slide>;
-  readonly mode: "vite" | "fs-access";
+  readonly mode: "vite" | "fs-access" | "readonly";
   readonly projectName: string;
   readonly lastSaveTs: number;
 }
