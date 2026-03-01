@@ -234,6 +234,8 @@ function CameraController({
   fov: number;
   transitionDuration: number;
 }) {
+  const lookAtRef = useRef(new THREE.Vector3(...target));
+
   useFrame(({ camera }, delta) => {
     const speed = 1 / Math.max(transitionDuration / 1000, 0.1);
     const t = Math.min(delta * speed * 3, 1);
@@ -246,16 +248,8 @@ function CameraController({
     );
     (camera as THREE.PerspectiveCamera).updateProjectionMatrix();
 
-    // Look at target
-    const currentTarget = new THREE.Vector3();
-    camera.getWorldDirection(currentTarget);
-    const desiredTarget = new THREE.Vector3(...target);
-    const lookTarget = new THREE.Vector3().lerpVectors(
-      new THREE.Vector3().addVectors(camera.position, currentTarget),
-      desiredTarget,
-      t,
-    );
-    camera.lookAt(lookTarget);
+    lookAtRef.current.lerp(new THREE.Vector3(...target), t);
+    camera.lookAt(lookAtRef.current);
   });
 
   return null;
