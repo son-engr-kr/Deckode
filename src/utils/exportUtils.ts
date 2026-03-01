@@ -78,7 +78,15 @@ export async function fetchImageAsBase64(src: string): Promise<string | null> {
 }
 
 export function hexToRgb(hex: string): [number, number, number] {
-  const clean = hex.replace(/^#/, "");
+  let clean = hex.replace(/^#/, "");
+  // Short hex: #RGB → RRGGBB
+  if (clean.length === 3 || clean.length === 4) {
+    clean = clean[0]! + clean[0]! + clean[1]! + clean[1]! + clean[2]! + clean[2]!;
+  }
+  // 8-char hex with alpha: RRGGBBAA → RRGGBB
+  if (clean.length === 8) {
+    clean = clean.slice(0, 6);
+  }
   const num = parseInt(clean, 16);
   return [(num >> 16) & 0xff, (num >> 8) & 0xff, num & 0xff];
 }
