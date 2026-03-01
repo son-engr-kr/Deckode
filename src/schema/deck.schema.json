@@ -105,6 +105,12 @@
             "striped": { "type": "boolean" },
             "borderRadius": { "type": "number" }
           }
+        },
+        "scene3d": {
+          "type": "object",
+          "properties": {
+            "borderRadius": { "type": "number" }
+          }
         }
       }
     },
@@ -160,7 +166,7 @@
       "required": ["id", "type", "position", "size"],
       "properties": {
         "id": { "type": "string" },
-        "type": { "type": "string", "enum": ["text", "image", "code", "shape", "video", "tikz", "table", "custom"] },
+        "type": { "type": "string", "enum": ["text", "image", "code", "shape", "video", "tikz", "table", "custom", "scene3d"] },
         "position": { "$ref": "#/$defs/Position" },
         "size": { "$ref": "#/$defs/Size" },
         "rotation": { "type": "number" },
@@ -180,6 +186,8 @@
         "rows": { "type": "array", "items": { "type": "array", "items": { "type": "string" } } },
         "component": { "type": "string" },
         "props": { "type": "object" },
+        "scene": { "type": "object" },
+        "keyframes": { "type": "array", "items": { "type": "object" } },
         "style": { "type": "object" }
       },
       "allOf": [
@@ -214,6 +222,10 @@
         {
           "if": { "properties": { "type": { "const": "custom" } } },
           "then": { "required": ["component"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "scene3d" } } },
+          "then": { "required": ["scene"] }
         }
       ]
     },
@@ -228,7 +240,7 @@
           "enum": [
             "fadeIn", "fadeOut",
             "slideInLeft", "slideInRight", "slideInUp", "slideInDown",
-            "scaleIn", "scaleOut", "typewriter"
+            "scaleIn", "scaleOut", "typewriter", "scene3dStep"
           ]
         },
         "delay": { "type": "number", "minimum": 0 },

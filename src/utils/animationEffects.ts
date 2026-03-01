@@ -42,6 +42,10 @@ const effects: Record<AnimationEffect, AnimationConfig> = {
     initial: { clipPath: "inset(0 100% 0 0)" },
     animate: { clipPath: "inset(0 0% 0 0)" },
   },
+  scene3dStep: {
+    initial: {},
+    animate: {},
+  },
 };
 
 export function getAnimationConfig(effect: AnimationEffect): AnimationConfig {

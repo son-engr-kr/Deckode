@@ -953,6 +953,27 @@ function drawCustomPlaceholder(doc: jsPDF, el: SlideElement): void {
 }
 
 // ========================================================================
+// Scene3D → PDF (placeholder — 3D canvas cannot be natively drawn in jsPDF)
+// ========================================================================
+
+function drawScene3DPlaceholder(doc: jsPDF, el: SlideElement): void {
+  const { x, y } = el.position;
+  const { w, h } = el.size;
+
+  setFillColor(doc, "#1a1a2e");
+  doc.rect(x, y, w, h, "F");
+
+  setDrawColor(doc, "#444466");
+  doc.setLineWidth(1);
+  doc.rect(x, y, w, h, "S");
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(14);
+  setTextColor(doc, "#8888aa");
+  doc.text("[3D Scene]", x + w / 2, y + h / 2, { align: "center" });
+}
+
+// ========================================================================
 // Slide rendering
 // ========================================================================
 
@@ -1018,6 +1039,9 @@ async function renderSlide(
         break;
       case "custom":
         drawCustomPlaceholder(doc, el);
+        break;
+      case "scene3d":
+        drawScene3DPlaceholder(doc, el);
         break;
     }
 

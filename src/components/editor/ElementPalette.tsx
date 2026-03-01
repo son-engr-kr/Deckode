@@ -86,6 +86,25 @@ const ELEMENT_PRESETS: { label: string; create: () => SlideElement }[] = [
       size: { w: 400, h: 300 },
     }),
   },
+  {
+    label: "3D Scene",
+    create: () => ({
+      id: nextElementId(),
+      type: "scene3d" as const,
+      position: { x: 200, y: 50 },
+      size: { w: 500, h: 400 },
+      scene: {
+        camera: { position: [5, 5, 5] as [number, number, number], fov: 50 },
+        ambientLight: 0.5,
+        directionalLight: { position: [5, 10, 5] as [number, number, number], intensity: 0.8 },
+        objects: [
+          { id: "box1", geometry: "box" as const, material: { color: "#3b82f6" } },
+        ],
+        orbitControls: true,
+        helpers: { grid: true },
+      },
+    }),
+  },
 ];
 
 export function ElementPalette() {

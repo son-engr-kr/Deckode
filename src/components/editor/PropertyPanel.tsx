@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useDeckStore } from "@/stores/deckStore";
-import type { Slide, SlideElement, TikZElement, TableElement, CustomElement } from "@/types/deck";
+import type { Slide, SlideElement, TikZElement, TableElement, CustomElement, Scene3DElement } from "@/types/deck";
 import { useAdapter } from "@/contexts/AdapterContext";
 import { AnimationEditor } from "./AnimationEditor";
 import {
@@ -124,6 +124,15 @@ export function PropertyPanel() {
       {/* Table properties */}
       {element.type === "table" && (
         <TableDataEditor
+          element={element}
+          slideId={slide.id}
+          updateElement={updateElement}
+        />
+      )}
+
+      {/* Scene3D properties */}
+      {element.type === "scene3d" && (
+        <Scene3DEditor
           element={element}
           slideId={slide.id}
           updateElement={updateElement}
@@ -292,7 +301,7 @@ function ElementStyleEditor({
   slideId: string;
   updateElement: (slideId: string, elementId: string, patch: Partial<SlideElement>) => void;
 }) {
-  if (element.type === "custom") return null;
+  if (element.type === "custom" || element.type === "scene3d") return null;
 
   const patchStyle = (prop: string, value: unknown) => {
     updateElement(slideId, element.id, {
@@ -713,6 +722,150 @@ function TableDataEditor({
           />
           Striped rows
         </label>
+      </div>
+    </>
+  );
+}
+
+function Scene3DEditor({
+  element,
+  slideId,
+  updateElement,
+}: {
+  element: Scene3DElement;
+  slideId: string;
+  updateElement: (slideId: string, elementId: string, patch: Partial<SlideElement>) => void;
+}) {
+  const [sceneDraft, setSceneDraft] = useState(() => JSON.stringify(element.scene, null, 2));
+  const [keyframesDraft, setKeyframesDraft] = useState(() =>
+    JSON.stringify(element.keyframes ?? [], null, 2),
+  );
+  const [sceneError, setSceneError] = useState<string | null>(null);
+  const [keyframesError, setKeyframesError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSceneDraft(JSON.stringify(element.scene, null, 2));
+    setSceneError(null);
+  }, [element.id]);
+
+  useEffect(() => {
+    setKeyframesDraft(JSON.stringify(element.keyframes ?? [], null, 2));
+    setKeyframesError(null);
+  }, [element.id]);
+
+  const handleSceneBlur = () => {
+    try {
+      const parsed = JSON.parse(sceneDraft);
+      setSceneError(null);
+      updateElement(slideId, element.id, { scene: parsed } as Partial<SlideElement>);
+    } catch (e: any) {
+      setSceneError(e.message);
+    }
+  };
+
+  const handleKeyframesBlur = () => {
+    try {
+      const parsed = JSON.parse(keyframesDraft);
+      setKeyframesError(null);
+      updateElement(slideId, element.id, { keyframes: parsed } as Partial<SlideElement>);
+    } catch (e: any) {
+      setKeyframesError(e.message);
+    }
+  };
+
+  const patchStyle = (prop: string, value: unknown) => {
+    updateElement(slideId, element.id, {
+      style: { ...element.style, [prop]: value },
+    } as Partial<SlideElement>);
+  };
+
+  const toggleSceneProp = (prop: "orbitControls") => {
+    const scene = { ...element.scene, [prop]: !element.scene[prop] };
+    updateElement(slideId, element.id, { scene } as Partial<SlideElement>);
+  };
+
+  const toggleHelper = (prop: "grid" | "axes") => {
+    const helpers = { ...element.scene.helpers, [prop]: !(element.scene.helpers?.[prop] ?? false) };
+    const scene = { ...element.scene, helpers };
+    updateElement(slideId, element.id, { scene } as Partial<SlideElement>);
+  };
+
+  return (
+    <>
+      <div>
+        <FieldLabel>Quick Toggles</FieldLabel>
+        <div className="space-y-1">
+          {(["orbitControls"] as const).map((prop) => (
+            <label key={prop} className="flex items-center gap-2 text-xs text-zinc-300">
+              <input
+                type="checkbox"
+                checked={!!element.scene[prop]}
+                onChange={() => toggleSceneProp(prop)}
+                className="rounded border-zinc-600"
+              />
+              Orbit Controls
+            </label>
+          ))}
+          <label className="flex items-center gap-2 text-xs text-zinc-300">
+            <input
+              type="checkbox"
+              checked={element.scene.helpers?.grid ?? false}
+              onChange={() => toggleHelper("grid")}
+              className="rounded border-zinc-600"
+            />
+            Grid
+          </label>
+          <label className="flex items-center gap-2 text-xs text-zinc-300">
+            <input
+              type="checkbox"
+              checked={element.scene.helpers?.axes ?? false}
+              onChange={() => toggleHelper("axes")}
+              className="rounded border-zinc-600"
+            />
+            Axes
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <FieldLabel>Style</FieldLabel>
+        <NumberField
+          label="Border Radius"
+          value={element.style?.borderRadius}
+          onChange={(v) => patchStyle("borderRadius", v)}
+          min={0}
+          max={32}
+        />
+      </div>
+
+      <div>
+        <FieldLabel>Scene (JSON)</FieldLabel>
+        <textarea
+          className="w-full bg-zinc-800 text-zinc-200 rounded px-2 py-1.5 text-xs font-mono resize-y min-h-32 border border-zinc-700 focus:border-blue-500 focus:outline-none"
+          value={sceneDraft}
+          rows={12}
+          spellCheck={false}
+          onChange={(e) => setSceneDraft(e.target.value)}
+          onBlur={handleSceneBlur}
+        />
+        {sceneError && (
+          <div className="text-red-400 text-xs mt-1 font-mono">{sceneError}</div>
+        )}
+      </div>
+
+      <div>
+        <FieldLabel>Keyframes (JSON)</FieldLabel>
+        <textarea
+          className="w-full bg-zinc-800 text-zinc-200 rounded px-2 py-1.5 text-xs font-mono resize-y min-h-20 border border-zinc-700 focus:border-blue-500 focus:outline-none"
+          value={keyframesDraft}
+          rows={8}
+          spellCheck={false}
+          onChange={(e) => setKeyframesDraft(e.target.value)}
+          onBlur={handleKeyframesBlur}
+        />
+        {keyframesError && (
+          <div className="text-red-400 text-xs mt-1 font-mono">{keyframesError}</div>
+        )}
       </div>
     </>
   );

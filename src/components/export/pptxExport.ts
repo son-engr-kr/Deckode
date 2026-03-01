@@ -142,6 +142,9 @@ async function addElement(
     case "custom":
       addCustomPlaceholder(slide, x, y, w, h, rotate);
       break;
+    case "scene3d":
+      addScene3DPlaceholder(slide, x, y, w, h, rotate);
+      break;
   }
 }
 
@@ -714,6 +717,41 @@ function addCustomPlaceholder(
     fontSize: 12,
     fontFace: "Arial",
     color: "888888",
+    align: "center",
+    valign: "middle",
+    rotate,
+  });
+}
+
+// ========================================================================
+// Scene3D placeholder
+// ========================================================================
+
+function addScene3DPlaceholder(
+  slide: PptxGenJS.Slide,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  rotate: number,
+) {
+  slide.addShape("rect" as PptxGenJS.ShapeType, {
+    x,
+    y,
+    w,
+    h,
+    fill: { color: "1A1A2E" },
+    line: { color: "444466", width: 1 },
+    rotate,
+  });
+  slide.addText("[3D Scene]", {
+    x,
+    y,
+    w,
+    h,
+    fontSize: 14,
+    fontFace: "Arial",
+    color: "8888AA",
     align: "center",
     valign: "middle",
     rotate,

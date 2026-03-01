@@ -85,6 +85,62 @@ export interface TableStyle {
   borderRadius?: number;
 }
 
+// ----- Scene3D -----
+
+export type Scene3DGeometry = "box" | "sphere" | "cylinder" | "cone" | "torus" | "plane";
+
+export interface Scene3DMaterial {
+  color?: string;
+  opacity?: number;
+  wireframe?: boolean;
+  metalness?: number;
+  roughness?: number;
+}
+
+export interface Scene3DObject {
+  id: string;
+  geometry: Scene3DGeometry;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  scale?: [number, number, number];
+  material?: Scene3DMaterial;
+  label?: string;
+  visible?: boolean;
+}
+
+export interface Scene3DCamera {
+  position: [number, number, number];
+  target?: [number, number, number];
+  fov?: number;
+}
+
+export interface Scene3DKeyframe {
+  duration?: number;
+  camera?: Partial<Scene3DCamera>;
+  changes: {
+    target: string;
+    position?: [number, number, number];
+    rotation?: [number, number, number];
+    scale?: [number, number, number];
+    material?: Partial<Scene3DMaterial>;
+    visible?: boolean;
+  }[];
+}
+
+export interface Scene3DConfig {
+  camera?: Scene3DCamera;
+  background?: string;
+  ambientLight?: number;
+  directionalLight?: { position: [number, number, number]; intensity?: number };
+  objects: Scene3DObject[];
+  helpers?: { grid?: boolean; axes?: boolean };
+  orbitControls?: boolean;
+}
+
+export interface Scene3DStyle {
+  borderRadius?: number;
+}
+
 // ----- Elements -----
 
 interface BaseElement {
@@ -153,7 +209,14 @@ export interface CustomElement extends BaseElement {
   props?: Record<string, unknown>;
 }
 
-export type SlideElement = TextElement | ImageElement | CodeElement | ShapeElement | VideoElement | TikZElement | TableElement | CustomElement;
+export interface Scene3DElement extends BaseElement {
+  type: "scene3d";
+  scene: Scene3DConfig;
+  keyframes?: Scene3DKeyframe[];
+  style?: Scene3DStyle;
+}
+
+export type SlideElement = TextElement | ImageElement | CodeElement | ShapeElement | VideoElement | TikZElement | TableElement | CustomElement | Scene3DElement;
 
 // ----- Animations -----
 
@@ -168,7 +231,8 @@ export type AnimationEffect =
   | "slideInDown"
   | "scaleIn"
   | "scaleOut"
-  | "typewriter";
+  | "typewriter"
+  | "scene3dStep";
 
 export interface Animation {
   target: string;
@@ -204,6 +268,7 @@ export interface DeckTheme {
   video?: Partial<VideoStyle>;
   tikz?: Partial<TikZStyle>;
   table?: Partial<TableStyle>;
+  scene3d?: Partial<Scene3DStyle>;
 }
 
 // ----- Deck (top-level) -----

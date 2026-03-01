@@ -7,6 +7,7 @@ const EFFECTS: AnimationEffect[] = [
   "slideInLeft", "slideInRight", "slideInUp", "slideInDown",
   "scaleIn", "scaleOut",
   "typewriter",
+  "scene3dStep",
 ];
 
 const TRIGGERS: AnimationTrigger[] = ["onEnter", "onClick", "onKey", "afterPrevious", "withPrevious"];
