@@ -404,9 +404,9 @@ export function deckApiPlugin(): Plugin {
         const docsDir = path.resolve(dir, "docs");
         fs.mkdirSync(docsDir, { recursive: true });
 
-        const guideSource = path.resolve(process.cwd(), "docs", "ai-slide-guide.md");
+        const guideSource = path.resolve(process.cwd(), "docs", "deckode-guide.md");
         if (fs.existsSync(guideSource)) {
-          fs.copyFileSync(guideSource, path.resolve(docsDir, "ai-slide-guide.md"));
+          fs.copyFileSync(guideSource, path.resolve(docsDir, "deckode-guide.md"));
         }
 
         jsonResponse(res, 200, { ok: true, name });
@@ -843,7 +843,7 @@ async function compileTikz(
 const AI_TOOLS_MANIFEST = {
   name: "deckode",
   description: "AI tools for creating and modifying Deckode slide decks. All endpoints require ?project=name parameter.",
-  guide: "/docs/ai-slide-guide.md",
+  guide: "/docs/deckode-guide.md",
   schema: "/src/schema/deck.schema.json",
   tools: [
     {

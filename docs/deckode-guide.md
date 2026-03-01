@@ -1,4 +1,4 @@
-# Deckode AI Slide Guide
+# Deckode Guide
 
 You are creating slides for Deckode, a local-first, JSON-based slide platform. This document is the complete specification for generating and modifying slide decks. It is the only reference you need.
 
@@ -22,7 +22,7 @@ my-project/
   assets/              # Images, videos, and other media (created on demand)
   components/          # Custom React components (optional, dev mode only)
   docs/
-    ai-slide-guide.md  # This file
+    deckode-guide.md   # This file
 ```
 
 Your primary task is to read and write `deck.json`. Assets go in `assets/` with relative paths (`"./assets/photo.png"`).
@@ -544,6 +544,281 @@ YouTube embed with controls:
 }
 ```
 
+### `"scene3d"`
+
+Renders an interactive 3D scene using Three.js (React Three Fiber). Supports multiple geometry types, PBR materials, camera controls, and keyframe animations.
+
+```json
+{
+  "id": "my-scene",
+  "type": "scene3d",
+  "position": { "x": 60, "y": 100 },
+  "size": { "w": 520, "h": 380 },
+  "scene": {
+    "camera": { "position": [4, 3, 4], "target": [0, 0, 0], "fov": 50 },
+    "ambientLight": 0.4,
+    "directionalLight": { "position": [5, 10, 5], "intensity": 0.9 },
+    "objects": [
+      {
+        "id": "cube",
+        "geometry": "box",
+        "position": [0, 0.5, 0],
+        "material": { "color": "#60a5fa", "metalness": 0.3, "roughness": 0.5 }
+      }
+    ],
+    "orbitControls": true,
+    "helpers": { "grid": true, "axes": true }
+  },
+  "keyframes": [ ... ],
+  "style": { "borderRadius": 12 }
+}
+```
+
+#### `scene` (Scene3DConfig) — required
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `camera` | object | no | Camera setup (see below). Default: position `[5, 5, 5]`, target `[0, 0, 0]`, fov `50` |
+| `background` | string | no | Scene background color (hex). Default: transparent (slide background shows through) |
+| `ambientLight` | number | no | Ambient light intensity (0-1). Default: `0.5` |
+| `directionalLight` | object | no | `{ position: [x, y, z], intensity?: number }`. Default intensity: `0.8` |
+| `objects` | array | yes | Array of Scene3DObject (see below) |
+| `helpers` | object | no | `{ grid?: boolean, axes?: boolean }`. Debug helpers |
+| `orbitControls` | boolean | no | Enable mouse drag-to-rotate. Default: `false` |
+
+**Camera**:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `position` | `[x, y, z]` | `[5, 5, 5]` | Camera location in 3D space |
+| `target` | `[x, y, z]` | `[0, 0, 0]` | Look-at point |
+| `fov` | number | `50` | Field of view in degrees |
+
+**Scene3DObject**:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | yes | Unique object ID (used by keyframe `target`) |
+| `geometry` | string | yes | `"box"` \| `"sphere"` \| `"cylinder"` \| `"cone"` \| `"torus"` \| `"plane"` \| `"line"` |
+| `position` | `[x, y, z]` | no | 3D position. Default: `[0, 0, 0]` |
+| `rotation` | `[x, y, z]` | no | Euler rotation in radians. Default: `[0, 0, 0]` |
+| `scale` | `[x, y, z]` | no | Scale factors. Default: `[1, 1, 1]` |
+| `material` | object | no | Material properties (see below) |
+| `label` | string | no | Text label displayed near the object |
+| `visible` | boolean | no | Initial visibility. Default: `true` |
+| `points` | `[x, y, z][]` | no | For `"line"` geometry only: array of 3D points defining the curve |
+
+**Material (Scene3DMaterial)**:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `color` | string | `"#ffffff"` | Hex color |
+| `opacity` | number | `1` | Opacity (0-1) |
+| `wireframe` | boolean | `false` | Render as wireframe |
+| `metalness` | number | `0` | Metallic appearance (0-1) |
+| `roughness` | number | `0.5` | Surface roughness (0-1) |
+| `lineWidth` | number | `2` | Line width (for `"line"` geometry only) |
+
+#### `keyframes` — optional
+
+Array of keyframe objects. Each keyframe defines a set of changes applied cumulatively when the scene advances a step.
+
+```json
+{
+  "keyframes": [
+    {
+      "duration": 800,
+      "camera": { "position": [0, 5, 6] },
+      "changes": [
+        { "target": "cube", "rotation": [0, 0.785, 0] },
+        { "target": "sphere", "visible": true }
+      ]
+    }
+  ]
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `duration` | number | no | Transition duration in ms |
+| `camera` | object | no | Camera changes: `position`, `target`, `fov` |
+| `changes` | array | yes | Array of object changes |
+| `changes[].target` | string | yes | Object ID to modify |
+| `changes[].position` | `[x, y, z]` | no | New position |
+| `changes[].rotation` | `[x, y, z]` | no | New rotation (radians) |
+| `changes[].scale` | `[x, y, z]` | no | New scale |
+| `changes[].material` | object | no | Material property changes (merged) |
+| `changes[].visible` | boolean | no | Show/hide the object |
+| `changes[].points` | `[x, y, z][]` | no | New curve points (for `"line"` geometry) |
+
+Keyframes are **cumulative**: step 2 applies on top of step 1's changes.
+
+#### Keyframe Animation Wiring
+
+To trigger keyframe steps during a presentation, add `scene3dStep` animations targeting the scene3d element. Each `onClick` + `scene3dStep` advances the scene by one keyframe.
+
+```json
+{
+  "animations": [
+    { "target": "my-scene", "trigger": "onEnter", "effect": "scaleIn", "duration": 500 },
+    { "target": "my-scene", "trigger": "onClick", "effect": "scene3dStep", "order": 1 },
+    { "target": "my-scene", "trigger": "onClick", "effect": "scene3dStep", "order": 2 },
+    { "target": "my-scene", "trigger": "onClick", "effect": "scene3dStep", "order": 3 }
+  ]
+}
+```
+
+The number of `scene3dStep` animations should match the number of keyframes. The `order` field sequences them.
+
+#### Style fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `borderRadius` | number | `0` | Corner radius in px |
+
+#### Tips
+
+- **Transparent background**: Omit `scene.background` so the slide background shows through the 3D canvas. This allows placing text or other elements behind the scene.
+- **Floor plane**: Use a `"plane"` geometry with rotation `[-1.5708, 0, 0]` (−π/2 on X) to create a horizontal floor. Scale it up to desired size.
+- **Orbit controls**: Enable `orbitControls: true` for interactive scenes the audience can rotate. Disable for static diagrams or when keyframe camera animations should not be overridden.
+- **Thumbnails**: Scene3D elements render a static SVG placeholder in slide thumbnails to avoid WebGL overhead.
+- **Object visibility**: Set `"visible": false` on objects to hide them initially, then reveal with a keyframe change `{ "target": "id", "visible": true }`.
+
+#### Line geometry example (3D data curves)
+
+```json
+{
+  "id": "graph-scene",
+  "type": "scene3d",
+  "position": { "x": 30, "y": 120 },
+  "size": { "w": 900, "h": 380 },
+  "scene": {
+    "background": "#f8fafc",
+    "camera": { "position": [6, 4, 6], "target": [2, 1, 0], "fov": 50 },
+    "ambientLight": 0.6,
+    "directionalLight": { "position": [5, 10, 5], "intensity": 0.8 },
+    "objects": [
+      {
+        "id": "revenue",
+        "geometry": "line",
+        "points": [
+          [0, 0, 0], [0.5, 0.8, 0], [1, 1.5, 0], [1.5, 1.8, 0],
+          [2, 2.0, 0], [2.5, 2.3, 0], [3, 2.8, 0], [3.5, 3.2, 0], [4, 3.5, 0]
+        ],
+        "material": { "color": "#3b82f6", "lineWidth": 3 },
+        "label": "Revenue"
+      },
+      {
+        "id": "costs",
+        "geometry": "line",
+        "points": [
+          [0, 0.5, 1], [0.5, 0.7, 1], [1, 0.6, 1], [1.5, 0.9, 1],
+          [2, 1.2, 1], [2.5, 1.0, 1], [3, 1.4, 1], [3.5, 1.8, 1], [4, 2.0, 1]
+        ],
+        "material": { "color": "#f59e0b", "lineWidth": 3 },
+        "label": "Costs"
+      }
+    ],
+    "orbitControls": true,
+    "helpers": { "grid": true, "axes": true }
+  },
+  "keyframes": [
+    {
+      "duration": 800,
+      "changes": [
+        {
+          "target": "revenue",
+          "points": [
+            [0, 0, 0], [0.5, 1.0, 0], [1, 1.8, 0], [1.5, 2.5, 0],
+            [2, 2.8, 0], [2.5, 3.0, 0], [3, 3.5, 0], [3.5, 4.0, 0], [4, 4.5, 0]
+          ]
+        }
+      ]
+    }
+  ],
+  "style": { "borderRadius": 12 }
+}
+```
+
+#### Complete scene3d example (interactive with keyframes)
+
+```json
+{
+  "id": "s3d-main",
+  "type": "scene3d",
+  "position": { "x": 60, "y": 100 },
+  "size": { "w": 520, "h": 380 },
+  "scene": {
+    "camera": { "position": [4, 3, 4], "target": [0, 0, 0], "fov": 50 },
+    "ambientLight": 0.4,
+    "directionalLight": { "position": [5, 10, 5], "intensity": 0.9 },
+    "objects": [
+      {
+        "id": "cube",
+        "geometry": "box",
+        "position": [0, 0.5, 0],
+        "material": { "color": "#60a5fa", "metalness": 0.3, "roughness": 0.5 }
+      },
+      {
+        "id": "sphere",
+        "geometry": "sphere",
+        "position": [2, 0.5, 0],
+        "scale": [0.8, 0.8, 0.8],
+        "material": { "color": "#fbbf24", "metalness": 0.5, "roughness": 0.3 },
+        "visible": false
+      },
+      {
+        "id": "floor",
+        "geometry": "plane",
+        "position": [0, 0, 0],
+        "rotation": [-1.5708, 0, 0],
+        "scale": [6, 6, 1],
+        "material": { "color": "#e8edf5", "roughness": 0.8 }
+      }
+    ],
+    "orbitControls": true,
+    "helpers": { "grid": true, "axes": true }
+  },
+  "keyframes": [
+    {
+      "duration": 800,
+      "camera": { "position": [0, 5, 6] },
+      "changes": [
+        { "target": "cube", "rotation": [0, 0.785, 0] }
+      ]
+    },
+    {
+      "duration": 600,
+      "changes": [
+        { "target": "sphere", "visible": true },
+        { "target": "cube", "material": { "color": "#a78bfa" } }
+      ]
+    },
+    {
+      "duration": 700,
+      "camera": { "position": [5, 2, 5] },
+      "changes": [
+        { "target": "sphere", "position": [2, 1.5, 0], "material": { "color": "#f87171" } },
+        { "target": "cube", "scale": [1.3, 1.3, 1.3] }
+      ]
+    }
+  ],
+  "style": { "borderRadius": 12 }
+}
+```
+
+Pair with these animations on the slide:
+```json
+{
+  "animations": [
+    { "target": "s3d-main", "trigger": "onEnter", "effect": "scaleIn", "duration": 500 },
+    { "target": "s3d-main", "trigger": "onClick", "effect": "scene3dStep", "order": 1 },
+    { "target": "s3d-main", "trigger": "onClick", "effect": "scene3dStep", "order": 2 },
+    { "target": "s3d-main", "trigger": "onClick", "effect": "scene3dStep", "order": 3 }
+  ]
+}
+```
+
 ---
 
 ## Animations
@@ -582,7 +857,9 @@ Animations are defined per-slide and reference elements by ID.
 | `"withPrevious"` | Plays simultaneously with the previous animation |
 | `"onKey"` | Plays when a specific key is pressed (requires `key` field) |
 
-**Available effects**: `fadeIn`, `fadeOut`, `slideInLeft`, `slideInRight`, `slideInUp`, `slideInDown`, `scaleIn`, `scaleOut`, `typewriter`
+**Available effects**: `fadeIn`, `fadeOut`, `slideInLeft`, `slideInRight`, `slideInUp`, `slideInDown`, `scaleIn`, `scaleOut`, `typewriter`, `scene3dStep`
+
+`scene3dStep` is a special effect for `scene3d` elements only. It does not produce a CSS animation — it advances the scene to the next keyframe. Pair one `scene3dStep` animation per keyframe, with sequential `order` values.
 
 ### Animation Examples
 

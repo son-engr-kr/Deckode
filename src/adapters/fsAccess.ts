@@ -7,7 +7,7 @@ import { assert } from "@/utils/assert";
 
 // Bundled template data for prod/FS Access mode (no server available)
 import exampleDeck from "../../templates/default/deck.json";
-import aiGuideText from "../../docs/ai-slide-guide.md?raw";
+import aiGuideText from "../../docs/deckode-guide.md?raw";
 import layoutBlank from "../../templates/default/layouts/blank.json";
 import layoutTitle from "../../templates/default/layouts/title.json";
 import layoutTitleContent from "../../templates/default/layouts/title-content.json";
@@ -109,7 +109,7 @@ export class FsAccessAdapter implements FileSystemAdapter {
 
     // Write docs/
     const docsDir = await projectDir.getDirectoryHandle("docs", { create: true });
-    await writeTextFile(docsDir, "ai-slide-guide.md", aiGuideText);
+    await writeTextFile(docsDir, "deckode-guide.md", aiGuideText);
 
     return projectDir;
   }

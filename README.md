@@ -48,7 +48,7 @@ deckode/
 │   └── utils/             # Utilities (TikZJax, diff, API helpers)
 ├── docs/
 │   ├── implementation-plan.md
-│   └── ai-slide-guide.md  # Specification for AI agents creating decks
+│   └── deckode-guide.md   # Specification for AI agents creating decks
 ├── templates/             # Built-in project templates
 └── public/
     └── tikzjax/           # WASM-based TeX engine for client-side TikZ
@@ -56,7 +56,7 @@ deckode/
 
 ## Deck Format
 
-Slides are stored as `deck.json` — a JSON scene graph. See [AI Slide Guide](docs/ai-slide-guide.md) for the full specification.
+Slides are stored as `deck.json` — a JSON scene graph. See [Deckode Guide](docs/deckode-guide.md) for the full specification.
 
 ```jsonc
 {
