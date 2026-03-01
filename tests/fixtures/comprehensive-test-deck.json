@@ -1,0 +1,317 @@
+{
+  "deckode": "1.0",
+  "meta": {
+    "title": "Comprehensive Export Test",
+    "author": "Test",
+    "aspectRatio": "16:9"
+  },
+  "theme": {
+    "slide": { "background": { "color": "#0f172a" } },
+    "text": { "color": "#ffffff", "fontSize": 24, "fontFamily": "Inter, system-ui, sans-serif" },
+    "code": { "fontSize": 16, "theme": "github-dark" },
+    "shape": { "stroke": "#ffffff", "strokeWidth": 1 },
+    "table": { "fontSize": 14, "color": "#e2e8f0", "headerBackground": "#1e293b", "headerColor": "#f8fafc", "borderColor": "#334155" }
+  },
+  "slides": [
+    {
+      "id": "slide-rich-text",
+      "elements": [
+        {
+          "id": "h1-text",
+          "type": "text",
+          "content": "# Heading Level 1\n\n## Heading Level 2\n\n### Heading Level 3",
+          "position": { "x": 50, "y": 20 },
+          "size": { "w": 860, "h": 200 }
+        },
+        {
+          "id": "formatted-text",
+          "type": "text",
+          "content": "This has **bold text**, *italic text*, and `inline code` all together.\n\nA second paragraph with **bold and *nested italic*** styles.",
+          "position": { "x": 50, "y": 240 },
+          "size": { "w": 860, "h": 250 }
+        }
+      ]
+    },
+    {
+      "id": "slide-bullets",
+      "elements": [
+        {
+          "id": "bullet-list",
+          "type": "text",
+          "content": "## Bullet Lists\n\n- First item with **bold**\n- Second item with *italic*\n- Third item with `code`\n- Fourth item plain text",
+          "position": { "x": 50, "y": 30 },
+          "size": { "w": 400, "h": 400 }
+        },
+        {
+          "id": "star-list",
+          "type": "text",
+          "content": "## Star Bullets\n\n* Item A\n* Item B with **emphasis**\n* Item C",
+          "position": { "x": 500, "y": 30 },
+          "size": { "w": 400, "h": 300 }
+        }
+      ]
+    },
+    {
+      "id": "slide-code",
+      "elements": [
+        {
+          "id": "ts-code",
+          "type": "code",
+          "language": "typescript",
+          "content": "interface User {\n  id: number;\n  name: string;\n  email: string;\n}\n\nfunction getUser(id: number): User {\n  return { id, name: 'Test', email: 'test@example.com' };\n}",
+          "position": { "x": 30, "y": 30 },
+          "size": { "w": 440, "h": 280 }
+        },
+        {
+          "id": "py-code",
+          "type": "code",
+          "language": "python",
+          "content": "def fibonacci(n: int) -> list[int]:\n    fib = [0, 1]\n    for i in range(2, n):\n        fib.append(fib[-1] + fib[-2])\n    return fib[:n]\n\nprint(fibonacci(10))",
+          "position": { "x": 490, "y": 30 },
+          "size": { "w": 440, "h": 280 }
+        }
+      ]
+    },
+    {
+      "id": "slide-shapes",
+      "elements": [
+        {
+          "id": "rect-blue",
+          "type": "shape",
+          "shape": "rectangle",
+          "position": { "x": 50, "y": 50 },
+          "size": { "w": 200, "h": 150 },
+          "style": { "fill": "#3b82f6", "stroke": "#60a5fa", "borderRadius": 12, "opacity": 1 }
+        },
+        {
+          "id": "rect-green-opacity",
+          "type": "shape",
+          "shape": "rectangle",
+          "position": { "x": 280, "y": 50 },
+          "size": { "w": 200, "h": 150 },
+          "style": { "fill": "#10b981", "stroke": "#34d399", "borderRadius": 0, "opacity": 0.6 }
+        },
+        {
+          "id": "ellipse-purple",
+          "type": "shape",
+          "shape": "ellipse",
+          "position": { "x": 510, "y": 50 },
+          "size": { "w": 200, "h": 150 },
+          "style": { "fill": "#8b5cf6", "stroke": "#a78bfa" }
+        },
+        {
+          "id": "line-red",
+          "type": "shape",
+          "shape": "line",
+          "position": { "x": 50, "y": 300 },
+          "size": { "w": 400, "h": 4 },
+          "style": { "stroke": "#ef4444", "strokeWidth": 3 }
+        },
+        {
+          "id": "arrow-orange",
+          "type": "shape",
+          "shape": "arrow",
+          "position": { "x": 50, "y": 380 },
+          "size": { "w": 400, "h": 20 },
+          "style": { "stroke": "#f59e0b", "strokeWidth": 2 }
+        }
+      ]
+    },
+    {
+      "id": "slide-math",
+      "elements": [
+        {
+          "id": "math-text",
+          "type": "text",
+          "content": "## Math Examples\n\nInline math: $E = mc^2$ and $\\sum_{i=1}^{n} i = \\frac{n(n+1)}{2}$\n\n$$\\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}$$\n\n$$\\mathbf{A} = \\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}$$",
+          "position": { "x": 50, "y": 30 },
+          "size": { "w": 860, "h": 460 }
+        }
+      ]
+    },
+    {
+      "id": "slide-table",
+      "elements": [
+        {
+          "id": "styled-table",
+          "type": "table",
+          "columns": ["Feature", "Canvas", "PDF Image", "PDF Native", "PPTX"],
+          "rows": [
+            ["Text selection", "Yes", "No", "Yes", "Yes"],
+            ["Vector shapes", "Yes", "No", "Yes", "Yes"],
+            ["File size", "N/A", "Large", "Small", "Medium"],
+            ["Syntax highlight", "Yes", "Yes", "Yes", "Yes"]
+          ],
+          "position": { "x": 50, "y": 50 },
+          "size": { "w": 860, "h": 300 }
+        }
+      ]
+    },
+    {
+      "id": "slide-custom-bg",
+      "background": { "color": "#1a1a2e" },
+      "elements": [
+        {
+          "id": "bg-text",
+          "type": "text",
+          "content": "# Custom Background Color\n\nThis slide has a non-default background color (#1a1a2e).",
+          "position": { "x": 50, "y": 50 },
+          "size": { "w": 860, "h": 200 }
+        }
+      ]
+    },
+    {
+      "id": "slide-rotation",
+      "elements": [
+        {
+          "id": "rotated-rect",
+          "type": "shape",
+          "shape": "rectangle",
+          "position": { "x": 100, "y": 100 },
+          "size": { "w": 200, "h": 100 },
+          "rotation": 30,
+          "style": { "fill": "#3b82f6", "stroke": "#60a5fa", "borderRadius": 4 }
+        },
+        {
+          "id": "rotated-text",
+          "type": "text",
+          "content": "Rotated 15 degrees",
+          "position": { "x": 400, "y": 150 },
+          "size": { "w": 300, "h": 60 },
+          "rotation": 15
+        },
+        {
+          "id": "rotated-ellipse",
+          "type": "shape",
+          "shape": "ellipse",
+          "position": { "x": 600, "y": 300 },
+          "size": { "w": 200, "h": 120 },
+          "rotation": -45,
+          "style": { "fill": "#f59e0b", "stroke": "#fbbf24" }
+        }
+      ]
+    },
+    {
+      "id": "slide-opacity",
+      "elements": [
+        {
+          "id": "full-opacity",
+          "type": "shape",
+          "shape": "rectangle",
+          "position": { "x": 50, "y": 100 },
+          "size": { "w": 150, "h": 150 },
+          "style": { "fill": "#ef4444", "opacity": 1 }
+        },
+        {
+          "id": "half-opacity",
+          "type": "shape",
+          "shape": "rectangle",
+          "position": { "x": 230, "y": 100 },
+          "size": { "w": 150, "h": 150 },
+          "style": { "fill": "#ef4444", "opacity": 0.5 }
+        },
+        {
+          "id": "quarter-opacity",
+          "type": "shape",
+          "shape": "rectangle",
+          "position": { "x": 410, "y": 100 },
+          "size": { "w": 150, "h": 150 },
+          "style": { "fill": "#ef4444", "opacity": 0.25 }
+        },
+        {
+          "id": "opacity-label",
+          "type": "text",
+          "content": "Opacity: 100% → 50% → 25%",
+          "position": { "x": 50, "y": 280 },
+          "size": { "w": 510, "h": 50 }
+        }
+      ]
+    },
+    {
+      "id": "slide-cjk",
+      "elements": [
+        {
+          "id": "korean-text",
+          "type": "text",
+          "content": "# 한국어 텍스트\n\n안녕하세요, 이것은 CJK 텍스트 테스트입니다.\n\n- 첫 번째 항목\n- 두 번째 항목",
+          "position": { "x": 50, "y": 30 },
+          "size": { "w": 400, "h": 300 }
+        },
+        {
+          "id": "japanese-text",
+          "type": "text",
+          "content": "# 日本語テキスト\n\nこんにちは世界",
+          "position": { "x": 500, "y": 30 },
+          "size": { "w": 400, "h": 200 }
+        }
+      ]
+    },
+    {
+      "id": "slide-flexible-text",
+      "elements": [
+        {
+          "id": "long-text-flexible",
+          "type": "text",
+          "content": "## Long Text Auto-Sizing\n\nThis text element has a lot of content that should automatically shrink to fit within the available space. The flexible text sizing mode performs a binary search to find the largest font size that fits.\n\n- Point one about auto-sizing\n- Point two about readability\n- Point three about layout\n- Point four about consistency",
+          "position": { "x": 50, "y": 30 },
+          "size": { "w": 400, "h": 300 },
+          "style": { "textSizing": "flexible" }
+        },
+        {
+          "id": "fixed-text",
+          "type": "text",
+          "content": "## Fixed Size Text\n\nThis text uses fixed sizing and may overflow.",
+          "position": { "x": 500, "y": 30 },
+          "size": { "w": 400, "h": 150 },
+          "style": { "textSizing": "fixed" }
+        }
+      ]
+    },
+    {
+      "id": "slide-edge-cases",
+      "elements": [
+        {
+          "id": "empty-text",
+          "type": "text",
+          "content": "",
+          "position": { "x": 50, "y": 50 },
+          "size": { "w": 200, "h": 50 }
+        },
+        {
+          "id": "very-long-line",
+          "type": "text",
+          "content": "This is a very long line of text that should wrap properly across the element boundary without breaking the layout or causing any overflow issues in the exported document formats.",
+          "position": { "x": 50, "y": 120 },
+          "size": { "w": 400, "h": 100 }
+        },
+        {
+          "id": "video-placeholder",
+          "type": "video",
+          "src": "test.mp4",
+          "position": { "x": 500, "y": 50 },
+          "size": { "w": 400, "h": 250 }
+        },
+        {
+          "id": "custom-element",
+          "type": "custom",
+          "component": "TestComponent",
+          "position": { "x": 500, "y": 330 },
+          "size": { "w": 200, "h": 100 }
+        }
+      ]
+    },
+    {
+      "id": "slide-hidden",
+      "hidden": true,
+      "elements": [
+        {
+          "id": "hidden-text",
+          "type": "text",
+          "content": "This slide should NOT appear in any export",
+          "position": { "x": 50, "y": 50 },
+          "size": { "w": 400, "h": 100 }
+        }
+      ]
+    }
+  ]
+}

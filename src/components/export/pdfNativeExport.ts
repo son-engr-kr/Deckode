@@ -31,11 +31,17 @@ import {
   DEFAULT_LINE_HEIGHT,
   DEFAULT_CODE_SIZE,
   DEFAULT_CODE_BG,
-  DEFAULT_CODE_FG,
   DEFAULT_CODE_RADIUS,
   DEFAULT_CODE_THEME,
   DEFAULT_TABLE_SIZE,
 } from "@/utils/exportUtils";
+import type { TextRun, ParsedLine } from "@/utils/markdownParser";
+import { parseMarkdownLines } from "@/utils/markdownParser";
+import { parseShikiHtml } from "@/utils/shikiTokenParser";
+import {
+  rasterizeHtmlToBase64 as rasterizeHtmlToImage,
+  rasterizeSvgToBase64 as rasterizeSvg,
+} from "@/utils/rasterize";
 
 const MIN_FONT_SIZE = 6;
 const RASTER_SCALE = 2;
@@ -80,168 +86,35 @@ function setTextColor(doc: jsPDF, hex: string): void {
   doc.setTextColor(r, g, b);
 }
 
-// ========================================================================
-// Inline markdown parsing → runs
-// ========================================================================
+// ---- Rotation helper ----
+// Applies a rotation transform around the element's center using the PDF
+// `cm` (concat matrix) operator. The caller must saveGraphicsState/restore.
 
-interface TextRun {
-  text: string;
-  bold: boolean;
-  italic: boolean;
-  code: boolean;
-  math: boolean; // inline math — will be rasterized
-}
-
-function parseInlineMarkdown(text: string): TextRun[] {
-  const runs: TextRun[] = [];
-  const re = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)|(\$(.+?)\$)/g;
-  let last = 0;
-  let m: RegExpExecArray | null;
-
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > last) {
-      runs.push({
-        text: text.slice(last, m.index),
-        bold: false,
-        italic: false,
-        code: false,
-        math: false,
-      });
-    }
-    if (m[2] !== undefined) {
-      runs.push({ text: m[2], bold: true, italic: false, code: false, math: false });
-    } else if (m[4] !== undefined) {
-      runs.push({ text: m[4], bold: false, italic: true, code: false, math: false });
-    } else if (m[6] !== undefined) {
-      runs.push({ text: m[6], bold: false, italic: false, code: true, math: false });
-    } else if (m[8] !== undefined) {
-      runs.push({ text: m[8], bold: false, italic: false, code: false, math: true });
-    }
-    last = m.index + m[0].length;
-  }
-
-  if (last < text.length) {
-    runs.push({
-      text: text.slice(last),
-      bold: false,
-      italic: false,
-      code: false,
-      math: false,
-    });
-  }
-
-  if (runs.length === 0) {
-    runs.push({ text, bold: false, italic: false, code: false, math: false });
-  }
-
-  return runs;
+function applyRotation(
+  doc: jsPDF,
+  cx: number,
+  cy: number,
+  angleDeg: number,
+): void {
+  const rad = (-angleDeg * Math.PI) / 180; // PDF rotates counter-clockwise
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  // jsPDF uses px units with hotfix; internal coordinates match our units.
+  // The affine matrix [a b c d e f] translates to PDF cm operator.
+  // We translate origin to center, rotate, then translate back.
+  const tx = cx - cos * cx - sin * cy;
+  const ty = cy + sin * cx - cos * cy;
+  // Use internal write to emit the cm operator
+  const f = (n: number) => n.toFixed(6);
+  // @ts-expect-error jsPDF internal.write exists but is not in TS defs
+  doc.internal.write(
+    `${f(cos)} ${f(sin)} ${f(-sin)} ${f(cos)} ${f(tx)} ${f(ty)} cm`,
+  );
 }
 
 // ========================================================================
 // Markdown text → PDF (drawText)
 // ========================================================================
-
-interface ParsedLine {
-  runs: TextRun[];
-  indent: number; // pixels of indent (for list items)
-  bullet: boolean;
-  fontScale: number; // heading scale
-  isBold: boolean; // heading forced bold
-  blockMath: string | null; // block math expression ($$...$$)
-}
-
-function parseMarkdownLines(source: string): ParsedLine[] {
-  const lines = source.split("\n");
-  const parsed: ParsedLine[] = [];
-  let mathBuf: string[] | null = null;
-
-  for (const line of lines) {
-    const t = line.trim();
-
-    // Block math delimiter $$
-    if (t === "$$") {
-      if (mathBuf === null) {
-        mathBuf = [];
-      } else {
-        parsed.push({
-          runs: [],
-          indent: 0,
-          bullet: false,
-          fontScale: 1,
-          isBold: false,
-          blockMath: mathBuf.join("\n"),
-        });
-        mathBuf = null;
-      }
-      continue;
-    }
-
-    // Inside block math
-    if (mathBuf !== null) {
-      mathBuf.push(line);
-      continue;
-    }
-
-    // Single-line block math $$...$$
-    const slm = t.match(/^\$\$(.+)\$\$$/);
-    if (slm) {
-      parsed.push({
-        runs: [],
-        indent: 0,
-        bullet: false,
-        fontScale: 1,
-        isBold: false,
-        blockMath: slm[1]!,
-      });
-      continue;
-    }
-
-    if (t === "") continue;
-
-    // Heading
-    const hm = t.match(/^(#{1,3})\s+(.+)$/);
-    if (hm) {
-      const level = hm[1]!.length as 1 | 2 | 3;
-      const scale = { 1: 1.8, 2: 1.4, 3: 1.1 }[level];
-      // h1=bold, h2=semibold(→bold in jsPDF), h3=medium(→normal in jsPDF)
-      const bold = level <= 2;
-      parsed.push({
-        runs: parseInlineMarkdown(hm[2]!),
-        indent: 0,
-        bullet: false,
-        fontScale: scale,
-        isBold: bold,
-        blockMath: null,
-      });
-      continue;
-    }
-
-    // List item (indent is computed at layout time as 1.5em, matching CSS)
-    if (t.startsWith("- ") || t.startsWith("* ")) {
-      parsed.push({
-        runs: parseInlineMarkdown(t.slice(2)),
-        indent: -1, // sentinel: computed as 1.5 * fontSize at layout time
-        bullet: true,
-        fontScale: 1,
-        isBold: false,
-        blockMath: null,
-      });
-      continue;
-    }
-
-    // Normal paragraph
-    parsed.push({
-      runs: parseInlineMarkdown(t),
-      indent: 0,
-      bullet: false,
-      fontScale: 1,
-      isBold: false,
-      blockMath: null,
-    });
-  }
-
-  return parsed;
-}
 
 // ---- Rasterize entire text element for CJK / non-Latin content ----
 // Mirrors pdfExport.ts buildText + mdToHtml pipeline: renders the text as
@@ -381,47 +254,6 @@ function rasterInlineHtml(text: string): string {
   return r;
 }
 
-// ---- Rasterize HTML to PNG data URL via offscreen DOM + canvas ----
-
-async function rasterizeHtmlToImage(
-  html: string,
-  maxWidth: number,
-  color: string,
-): Promise<{ dataUrl: string; width: number; height: number } | null> {
-  const wrapper = document.createElement("div");
-  wrapper.style.cssText =
-    "position:fixed;left:0;top:0;z-index:-2147483647;pointer-events:none";
-
-  const container = document.createElement("div");
-  container.style.cssText = `display:inline-block;max-width:${maxWidth}px;color:${color};font-size:16px`;
-  container.innerHTML = html;
-  wrapper.appendChild(container);
-  document.body.appendChild(wrapper);
-
-  // Wait for KaTeX fonts to load
-  await document.fonts.ready;
-  await new Promise((r) => setTimeout(r, 50));
-
-  const rect = container.getBoundingClientRect();
-  const w = Math.ceil(rect.width);
-  const h = Math.ceil(rect.height);
-
-  if (w === 0 || h === 0) {
-    wrapper.remove();
-    return null;
-  }
-
-  const { toPng } = await import("html-to-image");
-  const dataUrl = await toPng(container, {
-    width: w,
-    height: h,
-    pixelRatio: RASTER_SCALE,
-    skipFonts: false,
-  });
-
-  wrapper.remove();
-  return { dataUrl, width: w, height: h };
-}
 
 // ---- Layout and render text at a given font scale (returns total height) ----
 
@@ -756,77 +588,6 @@ async function drawText(
 // Shiki code → PDF (drawCode)
 // ========================================================================
 
-interface CodeToken {
-  text: string;
-  color: string;
-}
-
-function parseShikiHtml(html: string): CodeToken[][] {
-  const lines: CodeToken[][] = [];
-
-  // Extract content inside <code>...</code>
-  const codeMatch = html.match(/<code[^>]*>([\s\S]*?)<\/code>/);
-  if (!codeMatch) return lines;
-
-  // Split by <span class="line"> markers to get each line's content.
-  // The previous regex approach failed because (.*?) stopped at the first
-  // inner </span>, losing all tokens after the first per line.
-  const lineParts = codeMatch[1]!.split(/<span class="line">/);
-
-  for (const part of lineParts) {
-    if (part.trim().length === 0) continue;
-
-    // Remove the trailing </span> that closes the line span itself.
-    // There may be a trailing </span>\n or </span></code> etc.
-    const lineContent = part.replace(/<\/span>\s*$/, "");
-    const tokens: CodeToken[] = [];
-
-    // Extract all colored spans within this line
-    const tokenRegex =
-      /<span style="color:\s*(#[0-9a-fA-F]{3,8})">(.*?)<\/span>/g;
-    let tokenMatch: RegExpExecArray | null;
-    let lastEnd = 0;
-
-    while ((tokenMatch = tokenRegex.exec(lineContent)) !== null) {
-      // Plain text between tokens
-      if (tokenMatch.index > lastEnd) {
-        const plain = lineContent
-          .slice(lastEnd, tokenMatch.index)
-          .replace(/<[^>]*>/g, "");
-        if (plain.length > 0) {
-          tokens.push({ text: unescapeHtml(plain), color: DEFAULT_CODE_FG });
-        }
-      }
-      tokens.push({
-        text: unescapeHtml(tokenMatch[2]!),
-        color: tokenMatch[1]!,
-      });
-      lastEnd = tokenMatch.index + tokenMatch[0].length;
-    }
-
-    // Remaining text after last token
-    if (lastEnd < lineContent.length) {
-      const remaining = lineContent.slice(lastEnd).replace(/<[^>]*>/g, "");
-      if (remaining.length > 0) {
-        tokens.push({ text: unescapeHtml(remaining), color: DEFAULT_CODE_FG });
-      }
-    }
-
-    lines.push(tokens);
-  }
-
-  return lines;
-}
-
-function unescapeHtml(s: string): string {
-  return s
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/g, "'");
-}
 
 async function drawCode(
   doc: jsPDF,
@@ -903,9 +664,18 @@ function drawShape(doc: jsPDF, el: ShapeElement, deck: Deck): void {
   const s = resolveStyle<ShapeStyle>(deck.theme?.shape, el.style);
   const fill = s.fill ?? "transparent";
   const stroke = s.stroke ?? "#ffffff";
-  const strokeWidth = s.strokeWidth ?? 1;
+  // Browser defaults: rectangle=1, line/arrow=2 (see ShapeElement.tsx)
+  const isLineOrArrow = el.shape === "line" || el.shape === "arrow";
+  const strokeWidth = s.strokeWidth ?? (isLineOrArrow ? 2 : 1);
+  const opacity = s.opacity ?? 1;
   const { x, y } = el.position;
   const { w, h } = el.size;
+
+  if (opacity < 1) {
+    doc.saveGraphicsState();
+    // @ts-expect-error GState constructor is available on jsPDF instance
+    doc.setGState(new doc.GState({ opacity, "stroke-opacity": opacity }));
+  }
 
   doc.setLineWidth(strokeWidth);
   setDrawColor(doc, stroke);
@@ -945,6 +715,10 @@ function drawShape(doc: jsPDF, el: ShapeElement, deck: Deck): void {
       "F",
     );
   }
+
+  if (opacity < 1) {
+    doc.restoreGraphicsState();
+  }
 }
 
 // ========================================================================
@@ -957,16 +731,82 @@ async function drawImage(
   deck: Deck,
   adapter: FileSystemAdapter,
 ): Promise<void> {
-  resolveStyle<ImageStyle>(deck.theme?.image, el.style);
+  const s = resolveStyle<ImageStyle>(deck.theme?.image, el.style);
+  const objectFit = s.objectFit ?? "contain";
 
   const resolved = await resolveAssetSrc(el.src, adapter);
-  const b64 = await fetchImageAsBase64(resolved);
-  const imgData = b64 ?? resolved;
+  const isSvg =
+    resolved.endsWith(".svg") || resolved.startsWith("data:image/svg");
+
+  let imgData: string | null;
+  if (isSvg) {
+    // SVGs must be rasterized — jsPDF can't embed SVGs directly.
+    // rasterizeSvg already preserves aspect ratio in the canvas.
+    imgData = await rasterizeSvg(resolved, el.size.w, el.size.h);
+  } else {
+    imgData = await fetchImageAsBase64(resolved);
+  }
+  if (!imgData) return;
 
   const { x, y } = el.position;
   const { w, h } = el.size;
 
-  doc.addImage(imgData, "PNG", x, y, w, h);
+  // Load image to determine natural dimensions for object-fit
+  const img = new Image();
+  const loaded = await new Promise<boolean>((resolve) => {
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = imgData!;
+  });
+
+  if (!loaded) {
+    doc.addImage(imgData, "PNG", x, y, w, h);
+    return;
+  }
+
+  const nw = img.naturalWidth || w;
+  const nh = img.naturalHeight || h;
+
+  let rw: number, rh: number;
+  if (objectFit === "fill") {
+    rw = w;
+    rh = h;
+  } else if (objectFit === "cover") {
+    if (nw / nh > w / h) {
+      rh = h;
+      rw = h * (nw / nh);
+    } else {
+      rw = w;
+      rh = w * (nh / nw);
+    }
+  } else {
+    // contain (default): fit within box, preserve aspect ratio
+    if (nw / nh > w / h) {
+      rw = w;
+      rh = w * (nh / nw);
+    } else {
+      rh = h;
+      rw = h * (nw / nh);
+    }
+  }
+
+  // Center the image within the element box
+  const imgX = x + (w - rw) / 2;
+  const imgY = y + (h - rh) / 2;
+
+  // Apply opacity if set
+  const opacity = s.opacity ?? 1;
+  if (opacity < 1) {
+    doc.saveGraphicsState();
+    // @ts-expect-error GState constructor is available on jsPDF instance
+    doc.setGState(new doc.GState({ opacity }));
+  }
+
+  doc.addImage(imgData, "PNG", imgX, imgY, rw, rh);
+
+  if (opacity < 1) {
+    doc.restoreGraphicsState();
+  }
 }
 
 // ========================================================================
@@ -1051,49 +891,6 @@ function drawTable(doc: jsPDF, el: TableElement, deck: Deck): void {
 // instead, same as the image-based export path.
 // ========================================================================
 
-async function rasterizeSvg(
-  url: string,
-  w: number,
-  h: number,
-): Promise<string | null> {
-  const resp = await fetch(url);
-  if (!resp.ok) return null;
-  const svgText = await resp.text();
-  const blob = new Blob([svgText], {
-    type: "image/svg+xml;charset=utf-8",
-  });
-  const blobUrl = URL.createObjectURL(blob);
-  const img = new Image();
-  const loaded = await new Promise<boolean>((resolve) => {
-    img.onload = () => resolve(true);
-    img.onerror = () => resolve(false);
-    img.src = blobUrl;
-  });
-  if (!loaded) {
-    URL.revokeObjectURL(blobUrl);
-    return null;
-  }
-  // Preserve aspect ratio
-  const nw = img.naturalWidth || w;
-  const nh = img.naturalHeight || h;
-  let rw: number, rh: number;
-  if (nw / nh > w / h) {
-    rw = w;
-    rh = w * (nh / nw);
-  } else {
-    rh = h;
-    rw = h * (nw / nh);
-  }
-
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(rw * RASTER_SCALE);
-  canvas.height = Math.round(rh * RASTER_SCALE);
-  const ctx = canvas.getContext("2d")!;
-  ctx.scale(RASTER_SCALE, RASTER_SCALE);
-  ctx.drawImage(img, 0, 0, rw, rh);
-  URL.revokeObjectURL(blobUrl);
-  return canvas.toDataURL("image/png");
-}
 
 async function drawTikZ(
   doc: jsPDF,
@@ -1135,6 +932,27 @@ function drawVideo(doc: jsPDF, el: SlideElement): void {
 }
 
 // ========================================================================
+// Custom element → PDF (placeholder)
+// ========================================================================
+
+function drawCustomPlaceholder(doc: jsPDF, el: SlideElement): void {
+  const { x, y } = el.position;
+  const { w, h } = el.size;
+
+  setFillColor(doc, "#2d2d2d");
+  doc.rect(x, y, w, h, "F");
+
+  setDrawColor(doc, "#555555");
+  doc.setLineWidth(1);
+  doc.rect(x, y, w, h, "S");
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(12);
+  setTextColor(doc, "#888888");
+  doc.text("[Custom Element]", x + w / 2, y + h / 2, { align: "center" });
+}
+
+// ========================================================================
 // Slide rendering
 // ========================================================================
 
@@ -1150,8 +968,32 @@ async function renderSlide(
   setFillColor(doc, bgColor);
   doc.rect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT, "F");
 
+  // Background image (drawn on top of color fill)
+  if (bg?.image) {
+    const resolved = await resolveAssetSrc(bg.image, adapter);
+    const isSvg =
+      resolved.endsWith(".svg") || resolved.startsWith("data:image/svg");
+    let imgData: string | null;
+    if (isSvg) {
+      imgData = await rasterizeSvg(resolved, CANVAS_WIDTH, CANVAS_HEIGHT);
+    } else {
+      imgData = await fetchImageAsBase64(resolved);
+    }
+    if (imgData) {
+      doc.addImage(imgData, "PNG", 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    }
+  }
+
   // Render each element
   for (const el of slide.elements) {
+    const rotation = el.rotation ?? 0;
+    if (rotation !== 0) {
+      doc.saveGraphicsState();
+      const cx = el.position.x + el.size.w / 2;
+      const cy = el.position.y + el.size.h / 2;
+      applyRotation(doc, cx, cy, rotation);
+    }
+
     switch (el.type) {
       case "text":
         await drawText(doc, el, deck);
@@ -1174,6 +1016,13 @@ async function renderSlide(
       case "video":
         drawVideo(doc, el);
         break;
+      case "custom":
+        drawCustomPlaceholder(doc, el);
+        break;
+    }
+
+    if (rotation !== 0) {
+      doc.restoreGraphicsState();
     }
   }
 }

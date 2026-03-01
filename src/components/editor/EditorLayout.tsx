@@ -291,7 +291,7 @@ export function EditorLayout() {
         <button
           onClick={() => {
             const deck = useDeckStore.getState().deck;
-            if (deck) exportToPptx(deck);
+            if (deck) exportToPptx(deck, adapter);
           }}
           className="text-xs px-2 py-1 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
         >
