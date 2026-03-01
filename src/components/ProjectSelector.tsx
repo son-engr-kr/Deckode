@@ -76,6 +76,13 @@ function ViteProjectSelector({ onAdapterReady }: { onAdapterReady: (adapter: Fil
     fetchProjects();
   };
 
+  const handleOpenFolder = async () => {
+    const adapter = await FsAccessAdapter.openDirectory();
+    const deck = await adapter.loadDeck();
+    onAdapterReady(adapter);
+    useDeckStore.getState().openProject(adapter.projectName, deck);
+  };
+
   if (loading) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-zinc-950 text-zinc-400">
@@ -139,6 +146,12 @@ function ViteProjectSelector({ onAdapterReady }: { onAdapterReady: (adapter: Fil
               className="px-4 py-2.5 rounded bg-zinc-700 border border-zinc-600 text-sm text-zinc-200 hover:bg-zinc-600 transition-colors"
             >
               Open from GitHub
+            </button>
+            <button
+              onClick={handleOpenFolder}
+              className="px-4 py-2.5 rounded bg-zinc-700 border border-zinc-600 text-sm text-zinc-200 hover:bg-zinc-600 transition-colors"
+            >
+              Open Folder
             </button>
           </div>
         </div>

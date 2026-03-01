@@ -5,7 +5,7 @@ import { usePresentationChannel } from "@/hooks/usePresentationChannel";
 import { computeSteps } from "@/utils/animationSteps";
 import type { AnimationStep } from "@/utils/animationSteps";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/types/deck";
-import type { Deck, Slide, SlideTransition } from "@/types/deck";
+import type { Deck, Slide, SlideTransition, DeckTheme } from "@/types/deck";
 import { AnimatePresence, motion } from "framer-motion";
 
 function useVisibleSlides(deck: Deck | null) {
@@ -115,10 +115,19 @@ export function PresentationMode({ onExit }: PresentationModeProps) {
     [slide?.notes],
   );
 
-  // Reset activeStep on slide change
-  useEffect(() => {
-    setActiveStep(0);
-  }, [currentSlideIndex]);
+  // Synchronous reset during render to prevent stale activeStep flash.
+  // skipStepReset: BroadcastChannel explicitly sets both slide + step.
+  const [prevSlideIdx, setPrevSlideIdx] = useState(currentSlideIndex);
+  const skipStepResetRef = useRef(false);
+  if (currentSlideIndex !== prevSlideIdx) {
+    if (skipStepResetRef.current) {
+      skipStepResetRef.current = false;
+    } else {
+      const goingBack = currentSlideIndex < prevSlideIdx;
+      setActiveStep(goingBack ? steps.length : 0);
+    }
+    setPrevSlideIdx(currentSlideIndex);
+  }
 
   // Timer
   useEffect(() => {
@@ -173,6 +182,7 @@ export function PresentationMode({ onExit }: PresentationModeProps) {
   const { postNavigate, postExit, postPointer } = usePresentationChannel({
     onNavigate: (slideIndex, step) => {
       skipNextBroadcast.current = true;
+      skipStepResetRef.current = true;
       setCurrentSlide(slideIndex);
       setActiveStep(step);
     },
@@ -453,6 +463,7 @@ function PresenterConsole({
             onMouseLeave={onPointerLeave}
           >
             <SlideRenderer
+              key={slide.id}
               slide={slide}
               scale={currentScale}
               animate
@@ -487,6 +498,7 @@ function PresenterConsole({
             </div>
             {activeStep < steps.length ? (
               <SlideRenderer
+                key={slide.id}
                 slide={slide}
                 scale={nextScale}
                 animate
@@ -711,10 +723,9 @@ function AudienceSlideViewer({
             exit={variant.exit}
             transition={{ duration: (transition.duration ?? 300) / 1000 }}
           >
-            <SlideRenderer
+            <StableSlideContent
               slide={slide}
               scale={scale}
-              animate
               activeStep={activeStep}
               steps={steps}
               onAdvance={onAdvance}
@@ -735,5 +746,46 @@ function AudienceSlideViewer({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Stabilizes activeStep for use inside AnimatePresence.
+ * During exit, the parent's activeStep resets to 0, but this component
+ * guards against that by only syncing when the slide hasn't changed.
+ */
+function StableSlideContent({
+  slide,
+  scale,
+  activeStep,
+  steps,
+  onAdvance,
+  theme,
+}: {
+  slide: Slide;
+  scale: number;
+  activeStep: number;
+  steps: AnimationStep[];
+  onAdvance: () => void;
+  theme?: DeckTheme;
+}) {
+  const mountSlideId = useRef(slide.id);
+  const cachedStep = useRef(activeStep);
+
+  // Only update step if we're still the same slide (not exiting with stale props)
+  if (slide.id === mountSlideId.current) {
+    cachedStep.current = activeStep;
+  }
+
+  return (
+    <SlideRenderer
+      slide={slide}
+      scale={scale}
+      animate
+      activeStep={cachedStep.current}
+      steps={steps}
+      onAdvance={onAdvance}
+      theme={theme}
+    />
   );
 }

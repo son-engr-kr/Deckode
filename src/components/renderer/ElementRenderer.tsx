@@ -80,12 +80,20 @@ function AnimatedWrapper({
   children: React.ReactNode;
 }) {
   let initial: Record<string, string | number> = {};
-  let animate: Record<string, string | number> = {};
   let transition: Record<string, number> = {};
 
+  // First pass: merge all initial states
   for (const anim of animations) {
     const config = getAnimationConfig(anim.effect);
     initial = { ...initial, ...config.initial };
+  }
+
+  // Start animate from initial — non-active animations stay hidden.
+  // Active animations overlay their animate values on top.
+  let animate: Record<string, string | number> = { ...initial };
+
+  for (const anim of animations) {
+    const config = getAnimationConfig(anim.effect);
 
     // In preview mode, only activate animations explicitly in activeAnimations set.
     // In normal mode, onEnter always activates; others need activeAnimations.
@@ -110,7 +118,7 @@ function AnimatedWrapper({
       initial={initial}
       animate={animate}
       transition={transition}
-      style={{ width: "100%", height: "100%" }}
+      style={{ ...initial, width: "100%", height: "100%" }}
     >
       {children}
     </motion.div>

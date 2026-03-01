@@ -3,8 +3,8 @@ import { useDeckStore } from "@/stores/deckStore";
 import { SlideRenderer } from "@/components/renderer/SlideRenderer";
 import { computeSteps } from "@/utils/animationSteps";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/types/deck";
-import type { SlideTransition } from "@/types/deck";
-import { AnimatePresence, motion } from "framer-motion";
+import type { Slide, SlideTransition, DeckTheme } from "@/types/deck";
+import { AnimatePresence, motion, useIsPresent } from "framer-motion";
 
 const transitionVariants = {
   fade: {
@@ -30,7 +30,6 @@ export function ViewOnlyPresentation({ onExit }: ViewOnlyPresentationProps) {
   const setCurrentSlide = useDeckStore((s) => s.setCurrentSlide);
 
   const [scale, setScale] = useState(1);
-  const [activeStep, setActiveStep] = useState(0);
 
   const visibleSlides = useMemo(() => {
     if (!deck) return [];
@@ -47,15 +46,13 @@ export function ViewOnlyPresentation({ onExit }: ViewOnlyPresentationProps) {
   const slide = deck?.slides[currentSlideIndex];
   const totalSlides = visibleSlides.length;
 
-  const steps = useMemo(
-    () => computeSteps(slide?.animations ?? []),
-    [slide?.animations],
-  );
-
-  // Reset activeStep on slide change
-  useEffect(() => {
-    setActiveStep(0);
-  }, [currentSlideIndex]);
+  // Track navigation direction via ref
+  const prevSlideIdxRef = useRef(currentSlideIndex);
+  const goingBackRef = useRef(false);
+  if (currentSlideIndex !== prevSlideIdxRef.current) {
+    goingBackRef.current = currentSlideIndex < prevSlideIdxRef.current;
+    prevSlideIdxRef.current = currentSlideIndex;
+  }
 
   // Fit to viewport
   useEffect(() => {
@@ -79,65 +76,36 @@ export function ViewOnlyPresentation({ onExit }: ViewOnlyPresentationProps) {
     }
   }, [visibleSlides, visiblePosition, setCurrentSlide]);
 
-  // Stable refs for keyboard handler
-  const activeStepRef = useRef(activeStep);
-  activeStepRef.current = activeStep;
-  const stepsRef = useRef(steps);
-  stepsRef.current = steps;
+  // Stable refs for navigation callbacks
   const visibleSlidesRef = useRef(visibleSlides);
   visibleSlidesRef.current = visibleSlides;
   const visiblePositionRef = useRef(visiblePosition);
   visiblePositionRef.current = visiblePosition;
 
-  const advance = useCallback(() => {
-    if (activeStepRef.current < stepsRef.current.length) {
-      setActiveStep((prev) => prev + 1);
-    } else {
-      const vs = visibleSlidesRef.current;
-      const pos = visiblePositionRef.current;
-      if (pos !== -1 && pos + 1 < vs.length) {
-        setCurrentSlide(vs[pos + 1]!.originalIndex);
-      }
+  const nextVisibleSlide = useCallback(() => {
+    const vs = visibleSlidesRef.current;
+    const pos = visiblePositionRef.current;
+    if (pos !== -1 && pos + 1 < vs.length) {
+      setCurrentSlide(vs[pos + 1]!.originalIndex);
     }
   }, [setCurrentSlide]);
 
-  const goBack = useCallback(() => {
-    if (activeStepRef.current > 0) {
-      setActiveStep((prev) => prev - 1);
-    } else {
-      const vs = visibleSlidesRef.current;
-      const pos = visiblePositionRef.current;
-      if (pos > 0) {
-        setCurrentSlide(vs[pos - 1]!.originalIndex);
-      }
+  const prevVisibleSlide = useCallback(() => {
+    const vs = visibleSlidesRef.current;
+    const pos = visiblePositionRef.current;
+    if (pos > 0) {
+      setCurrentSlide(vs[pos - 1]!.originalIndex);
     }
   }, [setCurrentSlide]);
 
-  const advanceRef = useRef(advance);
-  advanceRef.current = advance;
-
-  // Keyboard navigation
+  // Escape stays in parent (no activeStep dependency)
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onExit();
-      } else if (e.key === "ArrowRight" || e.key === " ") {
-        e.preventDefault();
-        advanceRef.current();
-      } else if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        goBack();
-      } else {
-        const currentStep = stepsRef.current[activeStepRef.current];
-        if (currentStep?.trigger === "onKey" && currentStep.key === e.key) {
-          e.preventDefault();
-          advanceRef.current();
-        }
-      }
+      if (e.key === "Escape") onExit();
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [onExit, goBack]);
+  }, [onExit]);
 
   if (!deck || !slide) return null;
 
@@ -161,13 +129,12 @@ export function ViewOnlyPresentation({ onExit }: ViewOnlyPresentationProps) {
             exit={variant.exit}
             transition={{ duration: (transition.duration ?? 300) / 1000 }}
           >
-            <SlideRenderer
+            <ViewOnlySlideWithSteps
               slide={slide}
               scale={scale}
-              animate
-              activeStep={activeStep}
-              steps={steps}
-              onAdvance={advance}
+              goingBack={goingBackRef.current}
+              onNextSlide={nextVisibleSlide}
+              onPrevSlide={prevVisibleSlide}
               theme={deck.theme}
             />
           </motion.div>
@@ -179,5 +146,93 @@ export function ViewOnlyPresentation({ onExit }: ViewOnlyPresentationProps) {
         {displayPosition}/{totalSlides}
       </div>
     </div>
+  );
+}
+
+/**
+ * Per-slide step controller inside AnimatePresence.
+ * Each instance owns its own activeStep — old instances keep their state
+ * during exit, preventing reverse animation.
+ */
+function ViewOnlySlideWithSteps({
+  slide,
+  scale,
+  goingBack,
+  onNextSlide,
+  onPrevSlide,
+  theme,
+}: {
+  slide: Slide;
+  scale: number;
+  goingBack: boolean;
+  onNextSlide: () => void;
+  onPrevSlide: () => void;
+  theme?: DeckTheme;
+}) {
+  const steps = useMemo(
+    () => computeSteps(slide.animations ?? []),
+    [slide.animations],
+  );
+  const [activeStep, setActiveStep] = useState(
+    () => (goingBack ? steps.length : 0),
+  );
+  const isPresent = useIsPresent();
+
+  const activeStepRef = useRef(activeStep);
+  activeStepRef.current = activeStep;
+  const stepsRef = useRef(steps);
+  stepsRef.current = steps;
+
+  const advance = useCallback(() => {
+    if (activeStepRef.current < stepsRef.current.length) {
+      setActiveStep((prev) => prev + 1);
+    } else {
+      onNextSlide();
+    }
+  }, [onNextSlide]);
+
+  const goBackStep = useCallback(() => {
+    if (activeStepRef.current > 0) {
+      setActiveStep((prev) => prev - 1);
+    } else {
+      onPrevSlide();
+    }
+  }, [onPrevSlide]);
+
+  const advanceRef = useRef(advance);
+  advanceRef.current = advance;
+
+  // Keyboard navigation — disabled during AnimatePresence exit
+  useEffect(() => {
+    if (!isPresent) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight" || e.key === " ") {
+        e.preventDefault();
+        advanceRef.current();
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        goBackStep();
+      } else {
+        const currentStep = stepsRef.current[activeStepRef.current];
+        if (currentStep?.trigger === "onKey" && currentStep.key === e.key) {
+          e.preventDefault();
+          advanceRef.current();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [isPresent, goBackStep]);
+
+  return (
+    <SlideRenderer
+      slide={slide}
+      scale={scale}
+      animate
+      activeStep={activeStep}
+      steps={steps}
+      onAdvance={advance}
+      theme={theme}
+    />
   );
 }
