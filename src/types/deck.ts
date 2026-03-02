@@ -119,7 +119,7 @@ export interface Scene3DCamera {
 export interface Scene3DKeyframe {
   duration?: number;
   camera?: Partial<Scene3DCamera>;
-  changes: {
+  changes?: {
     target: string;
     position?: [number, number, number];
     rotation?: [number, number, number];

@@ -41,7 +41,7 @@ function resolveObjectState(
 
   for (let i = 0; i < sceneStep && i < keyframes.length; i++) {
     const kf = keyframes[i]!;
-    for (const change of kf.changes) {
+    for (const change of kf.changes ?? []) {
       if (change.target !== baseObj.id) continue;
       if (change.position) position = change.position;
       if (change.rotation) rotation = change.rotation;
